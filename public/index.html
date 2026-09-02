@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Rotasyon Portföyü</title>
+</head>
+<body>
+<style>
+  html,body{margin:0;padding:0;background:#0A1628;}
+  #rotasyon-root{max-width:none;border-radius:0;min-height:100vh;padding-bottom:90px;}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #0A1628;
+    --bg-2: #0F2039;
+    --panel: #132A48;
+    --panel-2: #1B3A5F;
+    --line: #294869;
+    --ink: #F1F5FA;
+    --ink-soft: #8CA0BC;
+    --brass: #2FB380;
+    --brass-light: #4FCB98;
+    --brass-soft: rgba(47,179,128,.16);
+    --accent-orange: #F0923D;
+    --accent-orange-soft: rgba(240,146,61,.14);
+    --gain: #4FCB98;
+    --gain-bg: rgba(79,203,152,.12);
+    --loss: #E0684F;
+    --loss-bg: rgba(224,104,79,.12);
+  }
+  *{box-sizing:border-box;}
+  #rotasyon-root{
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    padding:24px;
+    border-radius:16px;
+    max-width:960px;
+    margin:0 auto;
+  }
+  .masthead{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:20px;
+    padding:4px 4px 22px 4px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+    margin-bottom:22px;
+  }
+  .masthead-text .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 8px 0;
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:6px;height:6px;border-radius:50%;
+    background:var(--brass);
+    display:inline-block;
+  }
+  .masthead-text h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:28px;
+    letter-spacing:-.01em;
+    color:var(--ink);
+    margin:0;
+    line-height:1.1;
+  }
+  .masthead-text p{
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:8px 0 0 0;
+    max-width:420px;
+    line-height:1.5;
+  }
+
+  /* Goal gauge */
+  .gauge-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+  .header-stats-row{display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;}
+  .mini-stat{display:flex;flex-direction:column;align-items:flex-start;min-width:96px;padding-top:6px;}
+  .mini-stat-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;}
+  .mini-stat-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;color:var(--ink);}
+  .mini-stat-pct{font-family:'IBM Plex Mono',monospace;font-size:11px;margin-top:2px;color:var(--ink-soft);}
+  .gauge-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-top:2px;}
+  .gauge-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;color:var(--brass);}
+
+  .tabs{
+    position:sticky;
+    bottom:10px;
+    display:flex;
+    justify-content:space-around;
+    gap:4px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:6px;
+    margin-top:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .tab-btn{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:transparent;
+    border:none;
+    color:var(--ink-soft);
+    padding:11px 8px;
+    border-radius:12px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .tab-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  .tab-btn.active{
+    background:var(--brass);
+    color:#062318;
+  }
+  .tab-btn:not(.active):hover{background:var(--panel-2);color:var(--ink);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  h2.section-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px;
+    font-weight:600;
+    margin:0 0 16px 0;
+    color:var(--ink);
+    letter-spacing:-.005em;
+  }
+  .muted{color:var(--ink-soft);font-size:13px;line-height:1.6;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  .stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+  .stat-card{
+    flex:1;min-width:150px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .stat-card .label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;}
+  .stat-card .value{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-top:5px;letter-spacing:-.01em;}
+  .stat-card .value-pct{font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:3px;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--ink-soft);
+    text-align:right;
+    padding:6px 8px 10px 8px;
+    border-bottom:1px solid var(--line);
+    font-weight:500;
+  }
+  th:first-child, td:first-child{text-align:left;}
+  td{padding:10px 8px;text-align:right;border-bottom:1px solid var(--line);font-family:'IBM Plex Mono',monospace;color:var(--ink);}
+  tr:last-child td{border-bottom:none;}
+  tr.pair-divider td{border-bottom:none;padding-top:16px;padding-bottom:4px;}
+  .pair-tag{
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    color:var(--brass);
+    font-weight:600;
+    letter-spacing:.03em;
+    background:var(--brass-soft);
+    padding:3px 9px;
+    border-radius:5px;
+  }
+  .tick-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;color:var(--ink);}
+  .diff-up{color:var(--gain);font-weight:600;}
+  .diff-down{color:var(--loss);font-weight:600;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;}
+  .field input{
+    width:100%;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    padding:9px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--bg-2);
+    color:var(--ink);
+  }
+  .field input:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px var(--brass-soft);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;}
+  @media (max-width:520px){.grid2{grid-template-columns:1fr;}}
+
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    background:var(--brass);
+    color:#062318;
+    border:none;
+    padding:12px 22px;
+    border-radius:9px;
+    cursor:pointer;
+    margin-top:8px;
+    transition:.15s;
+  }
+  .btn:hover{filter:brightness(1.08);}
+  .btn.ghost{background:transparent;border:1px solid var(--loss);color:var(--loss);}
+  .btn.ghost:hover{background:var(--loss-bg);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .txn-list{list-style:none;padding:0;margin:16px 0 0 0;}
+  .txn-list li{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    padding:10px 4px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    color:var(--ink);
+  }
+  .txn-list li:last-child{border-bottom:none;}
+  .txn-tag{font-weight:700;padding:2px 8px;border-radius:5px;font-size:10.5px;font-family:'Inter',sans-serif;}
+  .txn-tag.AL{background:var(--gain-bg);color:var(--gain);}
+  .txn-tag.SAT{background:var(--loss-bg);color:var(--loss);}
+  .txn-tag.YOK{background:var(--panel-2);color:var(--ink-soft);}
+
+  .note-box{
+    background:var(--brass-soft);
+    border:1px solid rgba(201,161,94,.3);
+    padding:12px 16px;
+    font-size:12.5px;
+    color:var(--ink);
+    border-radius:10px;
+    margin:16px 0;
+    line-height:1.6;
+  }
+  .empty{
+    text-align:center;
+    padding:34px 10px;
+    color:var(--ink-soft);
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+  }
+  .chart-wrap{position:relative;}
+  .chart-tooltip{
+    position:absolute;
+    pointer-events:none;
+    background:#0B1310;
+    border:1px solid var(--brass);
+    border-radius:8px;
+    padding:8px 11px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--ink);
+    white-space:nowrap;
+    transform:translate(-50%,-118%);
+    opacity:0;
+    transition:opacity .12s;
+    z-index:5;
+    box-shadow:0 8px 18px rgba(0,0,0,.4);
+  }
+  .chart-tooltip.visible{opacity:1;}
+  .chart-tooltip .tt-date{color:var(--brass);font-weight:600;display:block;margin-bottom:4px;font-family:'Space Grotesk',sans-serif;}
+  .chart-tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;}
+  .chart-tooltip .tt-row + .tt-row{margin-top:2px;}
+</style>
+
+<div id="rotasyon-root">
+  <div class="masthead">
+    <div class="masthead-text" style="display:flex;gap:14px;align-items:flex-start;">
+      <img src="data:image/png;base64,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" alt="Smart Cüzdan logo" style="width:50px;height:50px;border-radius:50%;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,.4);margin-top:1px;">
+      <div>
+        <p class="eyebrow">Sanal Portföy · 6 Hisse · Karşıt Rotasyon</p>
+        <h1>Rotasyon Portföyü</h1>
+        <p>ASELS/THYAO · GARAN/CRDFA · EREGL/BIMAS (tematik gruplama) — her hisse ortak nakit havuzundan bağımsız olarak haftalık 200.000 ₺ bandına dengelenir</p>
+      </div>
+    </div>
+    <div class="header-stats-row">
+      <div class="gauge-wrap">
+        <svg width="112" height="72" viewBox="0 0 112 72" id="gauge-svg"></svg>
+        <div class="gauge-value" id="gauge-value">0 ₺</div>
+        <div class="gauge-label">Hedef: 10.000.000 ₺</div>
+      </div>
+      <div class="mini-stat">
+        <div class="mini-stat-label">Günlük K/Z</div>
+        <div class="mini-stat-value" id="daily-pnl-value">—</div>
+        <div class="mini-stat-pct" id="daily-pnl-pct"></div>
+      </div>
+      <div class="mini-stat">
+        <div class="mini-stat-label">Toplam K/Z</div>
+        <div class="mini-stat-value" id="total-pnl-value">—</div>
+        <div class="mini-stat-pct" id="total-pnl-pct"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-panel">
+    <div id="panel-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-gunluk">
+    <div id="gunluk-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-hafta">
+    <div id="hafta-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-istatistik">
+    <div id="istatistik-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-gecmis">
+    <div id="gecmis-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-yukleme-hatasi">
+    <div id="yukleme-hatasi-content"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-kurulum">
+    <div id="kurulum-content"></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab-btn" data-tab="panel" title="Panel" aria-label="Panel">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/></svg>
+    </button>
+    <button class="tab-btn" data-tab="gunluk" title="Günlük Takip" aria-label="Günlük Takip">
+      <svg viewBox="0 0 24 24"><path d="M3 13h3.5l2-6 4 12 2.5-9 1.5 3H21"/></svg>
+    </button>
+    <button class="tab-btn" data-tab="hafta" title="Bu Hafta" aria-label="Bu Hafta">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="m8.5 14.5 2 2 4-4"/></svg>
+    </button>
+    <button class="tab-btn" data-tab="istatistik" title="İstatistik" aria-label="İstatistik">
+      <svg viewBox="0 0 24 24"><path d="M4 20.5V3.5M4 20.5h16.5"/><rect x="7" y="13.5" width="3" height="6.5" rx="0.8"/><rect x="12.5" y="9" width="3" height="11" rx="0.8"/><rect x="18" y="5.5" width="3" height="14.5" rx="0.8"/></svg>
+    </button>
+    <button class="tab-btn" data-tab="gecmis" title="Geçmiş" aria-label="Geçmiş">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v5l3.5 2"/><path d="M8.5 3.5 5 6M15.5 3.5 19 6"/></svg>
+    </button>
+    <button class="tab-btn" data-tab="kurulum" title="Kurulum" aria-label="Kurulum">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2.06 2.06 0 1 1-2.92 2.92l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V19.6a2.06 2.06 0 1 1-4.12 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2.06 2.06 0 1 1-2.92-2.92l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H4.4a2.06 2.06 0 1 1 0-4.12h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2.06 2.06 0 1 1 2.92-2.92l.06.06a1.7 1.7 0 0 0 1.87.34H10.6A1.7 1.7 0 0 0 11.63 3H11.7a2.06 2.06 0 1 1 4.12 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2.06 2.06 0 1 1 2.92 2.92l-.06.06a1.7 1.7 0 0 0-.34 1.87v.07a1.7 1.7 0 0 0 1.56 1.03h.09a2.06 2.06 0 1 1 0 4.12h-.09a1.7 1.7 0 0 0-1.56 1.03z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// Claude artifact'ının window.storage'ı yerine, kendi backend'imize (Express + Redis)
+// bağlanan gerçek bir HTTP tabanlı depolama katmanı. Geri kalan uygulama kodu
+// (loadState/saveState vb.) hiç değişmeden aynı arayüzü kullanmaya devam ediyor.
+window.storage = {
+  async get(key, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key));
+    if(res.status === 404){ throw new Error('Key not found: ' + key); }
+    if(!res.ok){ throw new Error('Storage get failed: ' + res.status); }
+    const data = await res.json();
+    return { key, value: data.value, shared: !!shared };
+  },
+  async set(key, value, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ value })
+    });
+    if(!res.ok){ throw new Error('Storage set failed: ' + res.status); }
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    const res = await fetch('/api/storage/' + encodeURIComponent(key), { method: 'DELETE' });
+    if(!res.ok){ throw new Error('Storage delete failed: ' + res.status); }
+    return { key, deleted: true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    const res = await fetch('/api/storage?prefix=' + encodeURIComponent(prefix || ''));
+    if(!res.ok){ throw new Error('Storage list failed: ' + res.status); }
+    const data = await res.json();
+    return { keys: data.keys, prefix, shared: !!shared };
+  }
+};
+</script>
+<script>
+(function(){
+  const TICKERS = ['ASELS','THYAO','EREGL','GARAN','BIMAS','CRDFA'];
+  const PAIRS = [
+    {a:'ASELS', b:'THYAO', label:'ASELS ↔ THYAO · Savunma / Havacılık'},
+    {a:'GARAN', b:'CRDFA', label:'GARAN ↔ CRDFA · Banka / Faktoring'},
+    {a:'EREGL', b:'BIMAS', label:'EREGL ↔ BIMAS · Sanayi / Perakende'}
+  ];
+  const SEED_PRICES = { ASELS:350.00, THYAO:315.00, EREGL:42.00, GARAN:131.00, BIMAS:385.00, CRDFA:40.00 };
+  const TICKER_COLORS = { ASELS:'#4FCB98', THYAO:'#E0684F', EREGL:'#7FA3C9', GARAN:'#F0923D', BIMAS:'#C97FD1', CRDFA:'#5FD1C9' };
+  let dailyChartMode = 'genel'; // 'genel' | 'pozisyonlar'
+  const TOTAL_BUDGET = 2400000;
+  const CASH_BUDGET = 1200000;
+  const STOCK_BUDGET = 1200000;
+  const TARGET_PER_STOCK = STOCK_BUDGET / TICKERS.length; // 200.000
+  const GOAL = 10000000;
+  const DEFAULT_PPF_ANNUAL_PCT = 2.94; // Garanti Portföy Birinci Para Piyasası (TL) Fonu (GTL) - TEFAS'taki SON 1 AYLIK getiri yüzdesi (yıllık değil) — her kontrolünüzde güncel oranla değiştirin
+  const STORAGE_KEY = 'state';
+
+  let state = null;
+  let activeTab = 'panel';
+
+  function fmt(n){
+    return (n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ₺';
+  }
+  function fmtInt(n){
+    return (n||0).toLocaleString('tr-TR');
+  }
+  function nextFriday(){
+    const d = new Date();
+    const day = d.getDay(); // 0 Sun ... 5 Fri
+    let add = (5 - day + 7) % 7;
+    if(add === 0 && d.getHours() >= 19) add = 7;
+    d.setDate(d.getDate() + add);
+    return d.toISOString().slice(0,10);
+  }
+
+  // Bir tarihe, hafta sonlarını (Cmt/Paz) atlayarak N iş günü ekler.
+  // Örn: Cuma + 2 iş günü = Salı (Pazartesi 1. gün, Salı 2. gün).
+  function addBusinessDays(dateStr, n){
+    let d = new Date(dateStr + 'T00:00:00Z');
+    let added = 0;
+    while(added < n){
+      d.setUTCDate(d.getUTCDate() + 1);
+      const dow = d.getUTCDay(); // 0=Pazar, 6=Cumartesi
+      if(dow !== 0 && dow !== 6) added++;
+    }
+    return d.toISOString().slice(0,10);
+  }
+
+  // Verilen günde (dStr), henüz T+2 takası tamamlanmamış (bekleyen) satış tutarını
+  // döndürür — bu tutar o gün PPF faizine dahil edilmez.
+  function pendingSettlementAmount(dStr, settlements){
+    return (settlements||[]).reduce((sum, s) => {
+      return dStr <= s.availableFrom ? sum + s.amount : sum;
+    }, 0);
+  }
+
+  // Geçmiş işlem kayıtlarından, her hissenin ortalama maliyetini ve o ana kadar
+  // realize edilmiş (kapatılmış) toplam kâr/zararı yeniden inşa eder. Sadece
+  // geriye dönük uyumluluk için (eski kayıtlarda bu alanlar hiç tutulmuyordu).
+  function reconstructCostBasisAndRealizedPnL(){
+    const costBasis = {}, qty = {};
+    TICKERS.forEach(t => {
+      const p = state.history[0].positions && state.history[0].positions[t];
+      costBasis[t] = p ? p.price : (state.lastPrices[t]||0);
+      qty[t] = p ? p.qty : 0;
+    });
+    let realized = 0;
+    for(let i=1; i<state.history.length; i++){
+      (state.history[i].transactions||[]).forEach(tx => {
+        if(!tx.ticker || !tx.action || tx.action === 'YOK') return;
+        const t = tx.ticker;
+        if(tx.action === 'AL'){
+          const oldQty = qty[t]||0, newQty = oldQty + tx.qty;
+          const oldCost = costBasis[t] !== undefined ? costBasis[t] : tx.price;
+          costBasis[t] = newQty>0 ? (oldQty*oldCost + tx.qty*tx.price) / newQty : tx.price;
+          qty[t] = newQty;
+        } else if(tx.action === 'SAT'){
+          const cost = costBasis[t] !== undefined ? costBasis[t] : tx.price;
+          realized += (tx.price - cost) * tx.qty;
+          qty[t] = (qty[t]||0) - tx.qty;
+        }
+      });
+    }
+    return { costBasis, realized };
+  }
+
+  async function loadState(){
+    let loadError = false;
+    let detail = '';
+    try{
+      if(typeof window.storage === 'undefined'){
+        throw new Error('window.storage tanımsız (platform bu özelliği bu ortamda sağlamıyor olabilir)');
+      }
+      const res = await window.storage.get(STORAGE_KEY, false);
+      state = res ? JSON.parse(res.value) : null;
+    }catch(e){
+      // window.storage.get, kayıt gerçekten yokken de hata fırlatıyor — bu yüzden
+      // burada state=null yapmak "veri yok" ile "geçici okuma hatası"nı ayırt edemez.
+      // Güvenli taraf: kurulum ekranına DÜŞMEYİZ, retry ekranı gösteririz.
+      state = null;
+      loadError = true;
+      detail = (e && (e.message || e.toString())) || 'bilinmeyen hata';
+    }
+    window.__rotasyonLoadError = loadError;
+    window.__rotasyonLoadErrorDetail = detail;
+    if(state && state.initialized){
+      if(!state.dailyPrices) state.dailyPrices = Object.assign({}, state.lastPrices);
+      if(!state.dailyLog) state.dailyLog = [];
+      if(!state.cashSettlements) state.cashSettlements = [];
+      if(state.cashCostBasis === undefined) state.cashCostBasis = Math.max(0, state.cash - (state.cashInterestEarned||0));
+      if(state.totalStopajPaid === undefined) state.totalStopajPaid = 0;
+      if(!state.targetPerStock) state.targetPerStock = TARGET_PER_STOCK;
+      if(!state.cashThresholdPct) state.cashThresholdPct = 70;
+      if(state.cashAnnualYieldPct === undefined) state.cashAnnualYieldPct = 0;
+      if(!state.lastInterestDate) state.lastInterestDate = state.history[0].date;
+      if(state.cashInterestEarned === undefined) state.cashInterestEarned = 0;
+      if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
+      if(state.positionCostBasis === undefined || state.realizedPnL === undefined){
+        const rebuilt = reconstructCostBasisAndRealizedPnL();
+        if(state.positionCostBasis === undefined) state.positionCostBasis = rebuilt.costBasis;
+        if(state.realizedPnL === undefined) state.realizedPnL = rebuilt.realized;
+      }
+      if(state.cashInterestEarned === 0 && state.lastInterestDate && state.lastInterestDate !== state.history[0].date){
+        state.lastInterestDate = state.history[0].date;
+      }
+      const earned = accrueCashInterest();
+      if(earned) await saveState();
+    }
+  }
+  async function saveState(){
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+  }
+
+  function accrueCashInterest(){
+    if(!state || !state.initialized) return 0;
+    if(!state.cashAnnualYieldPct || state.cashAnnualYieldPct <= 0) { return 0; }
+    const today = new Date().toISOString().slice(0,10);
+    const last = state.lastInterestDate || today;
+    const daysElapsed = Math.round((new Date(today) - new Date(last)) / 86400000);
+    if(daysElapsed <= 0){ return 0; }
+    const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1; // girilen deger TEFAS 1 aylik % (yillik degil)
+    const before = state.cash;
+    if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
+    if(!state.cashSettlements) state.cashSettlements = [];
+    // Her günü ayrı ayrı işle — böylece araya kaç gün girerse girsin, her günün
+    // kendi payını (o günün sonundaki nakit bakiyesini) ayrı ayrı bilebiliyoruz.
+    // T+2 takas: o gün henüz takası tamamlanmamış satış tutarı faize dahil edilmez.
+    let cursor = new Date(last + 'T00:00:00Z');
+    for(let i=0; i<daysElapsed; i++){
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      const dStr = cursor.toISOString().slice(0,10);
+      const pending = pendingSettlementAmount(dStr, state.cashSettlements);
+      const eligible = Math.max(0, state.cash - pending);
+      state.cash = state.cash + eligible * dailyRate;
+      state.dailyCashSnapshots[dStr] = state.cash;
+    }
+    state.cashInterestEarned = (state.cashInterestEarned||0) + (state.cash - before);
+    state.lastInterestDate = today;
+    return state.cash - before;
+  }
+
+  // Geçmişteki faiz kaydını YENİ bir yıllık oranla baştan kurar — ama rotasyonların
+  // (Bu Hafta'da uygulanan alım/satımların) gerçek nakit etkisini bozmaz. Sadece
+  // hatalı/yanlış bir oran varsayımıyla işlenmiş geçmişi düzeltmek için kullanılır
+  // (normal akışta oran değişikliği SADECE ileriye dönük uygulanır, bu fonksiyon
+  // istisnai bir "geçmişi düzelt" aracıdır).
+  function recalculateInterestHistory(newAnnualPct){
+    if(!state || !state.initialized) return null;
+    const oldSnapshots = state.dailyCashSnapshots || {};
+    const kurulumDate = state.history[0].date;
+    const kurulumCash = state.history[0].cash;
+
+    // 1) Her rotasyon tarihinin, SADECE faizden kaynaklanan (eski oranla) beklenen
+    //    nakdinden ne kadar saptığını bul — bu sapma, o rotasyonun gerçek alım/satım
+    //    etkisidir (orandan bağımsız, tarihsel bir gerçektir, korunmalı).
+    const tradeDeltas = {}; // { 'YYYY-MM-DD': tutar }
+    for(let i=1; i<state.history.length; i++){
+      const entry = state.history[i];
+      const prevDateKey = new Date(entry.date + 'T00:00:00Z');
+      prevDateKey.setUTCDate(prevDateKey.getUTCDate() - 1);
+      const prevKey = prevDateKey.toISOString().slice(0,10);
+      const expectedInterestOnlyCash = oldSnapshots[prevKey] !== undefined ? oldSnapshots[prevKey] : kurulumCash;
+      // O günün faiz payı da eski snapshot'tan biliniyorsa çıkar, bilinmiyorsa 0 kabul et
+      const expectedOnRotationDate = oldSnapshots[entry.date] !== undefined ? oldSnapshots[entry.date] : expectedInterestOnlyCash;
+      tradeDeltas[entry.date] = entry.cash - expectedOnRotationDate;
+    }
+
+    // 2) Kuruluştan bugüne, YENİ oranla gün gün yeniden kur; rotasyon günlerinde
+    //    yukarıda bulunan gerçek alım/satım etkisini (tradeDelta) ekle.
+    const today = new Date().toISOString().slice(0,10);
+    const dailyRate = newAnnualPct > 0 ? Math.pow(1 + newAnnualPct/100, 1/30) - 1 : 0; // girilen deger TEFAS 1 aylik %
+    let runningCash = kurulumCash;
+    const newSnapshots = {};
+    let cursor = new Date(kurulumDate + 'T00:00:00Z');
+    let totalInterest = 0;
+    while(cursor.toISOString().slice(0,10) < today){
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      const dStr = cursor.toISOString().slice(0,10);
+      const pending = pendingSettlementAmount(dStr, state.cashSettlements);
+      const eligible = Math.max(0, runningCash - pending);
+      const interestPortion = eligible * dailyRate;
+      runningCash += interestPortion;
+      totalInterest += interestPortion;
+      if(tradeDeltas[dStr] !== undefined){
+        runningCash += tradeDeltas[dStr];
+      }
+      newSnapshots[dStr] = runningCash;
+    }
+
+    state.cash = runningCash;
+    state.cashAnnualYieldPct = newAnnualPct;
+    state.cashInterestEarned = totalInterest;
+    state.dailyCashSnapshots = newSnapshots;
+    state.lastInterestDate = today;
+    return totalInterest;
+  }
+
+  function computeDailyPnl(){
+    // "Günlük K/Z" = bugün ile TAM OLARAK dün arasındaki fark — araya kaç gün
+    // girerse girsin birikmiş faizin tamamı değil, sadece son 1 günün payı.
+    const totalNow = currentValue();
+    const todayStr = new Date().toISOString().slice(0,10);
+    const yesterday = new Date(todayStr + 'T00:00:00Z');
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0,10);
+
+    let cashYesterday;
+    if(state.dailyCashSnapshots && state.dailyCashSnapshots[yesterdayStr] !== undefined){
+      cashYesterday = state.dailyCashSnapshots[yesterdayStr];
+    } else if(state.cashAnnualYieldPct > 0){
+      // Dünün kaydı yoksa, bugünkü nakitten bir günlük faizi geri çıkararak tahmin et
+      const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1; // girilen deger TEFAS 1 aylik % (yillik degil)
+      cashYesterday = state.cash / (1 + dailyRate);
+    } else {
+      cashYesterday = state.cash;
+    }
+
+    // Hisse tarafı: sadece GÜVENİLİR (yeni formatta stockValue içeren) bir kayıt varsa
+    // onu kullan. Eski kayıtlarda bu alan yoksa ya da hiç kayıt yoksa, farklı zaman
+    // dilimlerini birbirine karıştırmamak için hisse tarafında değişim olmadığını
+    // (bugünkü hisse değeriyle aynı) varsayıyoruz — bu, hatalı büyük sapmalar yerine
+    // güvenli/muhafazakâr bir varsayılan.
+    const stockValNow = TICKERS.reduce((s,t)=>s+state.positions[t]*(state.dailyPrices[t]||state.lastPrices[t]),0);
+    let stockYesterday = stockValNow;
+    if(state.dailyLog && state.dailyLog.length){
+      for(let i=state.dailyLog.length-1; i>=0; i--){
+        const entry = state.dailyLog[i];
+        if(entry.date.slice(0,10) !== todayStr){
+          if(entry.stockValue !== undefined){ stockYesterday = entry.stockValue; }
+          break;
+        }
+      }
+    }
+
+    const baseline = cashYesterday + stockYesterday;
+    return totalNow - baseline;
+  }
+
+  function currentValue(){
+    if(!state || !state.initialized) return 0;
+    let v = state.cash;
+    TICKERS.forEach(t => v += state.positions[t] * (state.dailyPrices[t] ?? state.lastPrices[t]));
+    return v;
+  }
+
+  function drawGauge(){
+    const total = currentValue();
+    const pct = Math.max(0, Math.min(1, total / GOAL));
+    const svg = document.getElementById('gauge-svg');
+    const cx=56, cy=62, r=48;
+    const x1 = cx + r*Math.cos(Math.PI), y1 = cy + r*Math.sin(Math.PI);
+    const x2 = cx + r*Math.cos(0), y2 = cy + r*Math.sin(0);
+    const endAngle = Math.PI - pct*Math.PI;
+    const nx = cx + r*Math.cos(endAngle), ny = cy + r*Math.sin(endAngle);
+    const largeArc = pct > 0.5 ? 1 : 0;
+    svg.innerHTML = `
+      <path d="M ${x1} ${y1} A ${r} ${r} 0 1 1 ${x2} ${y2}" fill="none" stroke="#294869" stroke-width="9" stroke-linecap="round"/>
+      <path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${nx} ${ny}" fill="none" stroke="#2FB380" stroke-width="9" stroke-linecap="round"/>
+      <text x="${cx}" y="${cy-6}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" fill="#F1F5FA" font-weight="600">%${(pct*100).toFixed(1)}</text>
+    `;
+    document.getElementById('gauge-value').textContent = fmt(total);
+    updateHeaderStats();
+  }
+
+  function updateHeaderStats(){
+    const dv = document.getElementById('daily-pnl-value');
+    const dp = document.getElementById('daily-pnl-pct');
+    const tv = document.getElementById('total-pnl-value');
+    const tp = document.getElementById('total-pnl-pct');
+    if(!state || !state.initialized){
+      dv.textContent = '—'; dp.textContent = '';
+      tv.textContent = '—'; tp.textContent = '';
+      dv.className = 'mini-stat-value'; tv.className = 'mini-stat-value';
+      return;
+    }
+    const totalNow = currentValue();
+    const totalPnl = totalNow - TOTAL_BUDGET;
+    const totalPnlPct = TOTAL_BUDGET ? (totalPnl/TOTAL_BUDGET*100) : 0;
+
+    const dailyPnl = computeDailyPnl();
+    const dailyBaseline = totalNow - dailyPnl;
+    const dailyPnlPct = dailyBaseline ? (dailyPnl/dailyBaseline*100) : 0;
+
+    dv.textContent = (dailyPnl>=0?'+':'') + fmt(dailyPnl);
+    dv.className = 'mini-stat-value ' + (dailyPnl>=0 ? 'diff-up' : 'diff-down');
+    dp.textContent = (dailyPnl>=0?'+':'') + dailyPnlPct.toFixed(2) + '%';
+    dp.className = 'mini-stat-pct ' + (dailyPnl>=0 ? 'diff-up' : 'diff-down');
+
+    tv.textContent = (totalPnl>=0?'+':'') + fmt(totalPnl);
+    tv.className = 'mini-stat-value ' + (totalPnl>=0 ? 'diff-up' : 'diff-down');
+    tp.textContent = (totalPnl>=0?'+':'') + totalPnlPct.toFixed(2) + '%';
+    tp.className = 'mini-stat-pct ' + (totalPnl>=0 ? 'diff-up' : 'diff-down');
+  }
+
+  function setTab(tab){
+    activeTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+    render();
+  }
+
+  function renderKurulum(){
+    const el = document.getElementById('kurulum-content');
+    if(state && state.initialized){
+      el.innerHTML = `
+        <div class="card">
+          <h2 class="section-title">Kurulum</h2>
+          <div class="note-box">Portföy zaten kurulu (${state.history[0].date} tarihinde). Yeniden kurmak mevcut tüm geçmişi siler.</div>
+          <button class="btn ghost" id="reset-btn">Portföyü Sıfırla</button>
+        </div>
+        <div class="card">
+          <h2 class="section-title" style="font-size:14px;">Veriyi Dışa Aktar</h2>
+          <p class="muted" style="margin-bottom:12px;">Bu, portföyünüzün tam JSON verisi — Render/Upstash'e taşımak (seed-data.js) ya da yedek almak için kullanılır.</p>
+          <button class="btn ghost" id="export-json-btn">JSON'u Göster</button>
+          <textarea id="export-json-area" readonly style="display:none;width:100%;height:180px;margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;"></textarea>
+          <button class="btn ghost" id="copy-json-btn" style="display:none;margin-top:8px;">Panoya Kopyala</button>
+          <span id="copy-json-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
+        </div>
+        <div class="card" style="border-color:var(--loss);">
+          <h2 class="section-title" style="font-size:14px;">Veriyi İçe Aktar (Geri Yükle)</h2>
+          <p class="muted" style="margin-bottom:12px;">Daha önce dışa aktardığınız bir JSON'u yapıştırıp portföyü o ana geri döndürebilirsiniz. <b>Dikkat:</b> bu, şu anki portföyün üzerine yazar, geri alınamaz.</p>
+          <textarea id="import-json-area" placeholder="JSON'u buraya yapıştırın..." style="width:100%;height:140px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;"></textarea>
+          <button class="btn ghost" id="import-json-btn" style="margin-top:10px;border-color:var(--loss);color:var(--loss);">JSON'u Yükle</button>
+          <span id="import-json-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
+        </div>
+      `;
+      document.getElementById('reset-btn').onclick = (e) => confirmInline(e.currentTarget, 'Tüm portföy verisi ve geçmiş silinecek, emin misiniz?', async () => {
+        state = null;
+        await window.storage.delete(STORAGE_KEY, false).catch(()=>{});
+        render();
+      });
+      document.getElementById('import-json-btn').onclick = (e) => confirmInline(e.currentTarget, 'Yapıştırdığınız JSON, mevcut portföyün üzerine yazılacak. Emin misiniz?', async () => {
+        const msgEl = document.getElementById('import-json-msg');
+        const raw = document.getElementById('import-json-area').value.trim();
+        let parsed;
+        try{
+          parsed = JSON.parse(raw);
+        }catch(err){
+          if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Geçersiz JSON.'; }
+          renderKurulum();
+          return;
+        }
+        if(!parsed || !parsed.initialized || !parsed.positions || !parsed.history){
+          if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Bu JSON bir portföy verisine benzemiyor.'; }
+          renderKurulum();
+          return;
+        }
+        state = parsed;
+        await saveState();
+        setTab('panel');
+      });
+      document.getElementById('export-json-btn').onclick = () => {
+        const area = document.getElementById('export-json-area');
+        area.value = JSON.stringify(state, null, 2);
+        area.style.display = 'block';
+        document.getElementById('copy-json-btn').style.display = 'inline-block';
+      };
+      document.getElementById('copy-json-btn').onclick = async () => {
+        const area = document.getElementById('export-json-area');
+        const msgEl = document.getElementById('copy-json-msg');
+        try{
+          area.select();
+          await navigator.clipboard.writeText(area.value);
+          msgEl.style.color = 'var(--gain)';
+          msgEl.textContent = '✓ Kopyalandı';
+        }catch(e){
+          msgEl.style.color = 'var(--ink-soft)';
+          msgEl.textContent = 'Otomatik kopyalanamadı, metni elle seçip kopyalayın.';
+        }
+      };
+      return;
+    }
+    el.innerHTML = `
+      <div class="card">
+        <h2 class="section-title">Portföyü Kur</h2>
+        <p class="muted">Toplam bütçe <b>${fmt(TOTAL_BUDGET)}</b> — %50 nakit (${fmt(CASH_BUDGET)}), %50 hisse (${fmt(STOCK_BUDGET)}, hisse başına ~${fmt(TARGET_PER_STOCK)}).
+        Seçtiğiniz tarihteki kapanış fiyatlarıyla eşit ağırlıklı alım yapılır — lot küsüratları otomatik nakde eklenir.</p>
+        <div class="field" style="max-width:220px;">
+          <label>Kurulum Tarihi</label>
+          <input type="date" id="kur-date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="field" style="max-width:280px;">
+          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Aylık %)</label>
+          <input type="number" step="0.01" min="0" id="kur-ppf" value="${DEFAULT_PPF_ANNUAL_PCT}">
+        </div>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;font-size:11.5px;">TEFAS'ta GTL fon sayfasındaki <b>"Son 1 Ay"</b> getiri yüzdesini olduğu gibi buraya girin (yıllıklandırma otomatik yapılır). Bu oran sık değişir, her kontrolünüzde güncel 1 aylık değerle güncelleyin. 0 girerseniz nakde faiz işlenmez.</p>
+        <div class="grid2" id="kurulum-inputs"></div>
+        <button class="btn" id="kur-btn">Portföyü Kur</button>
+        <div id="kur-error" style="color:var(--loss);font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:8px;"></div>
+      </div>
+      <div class="card" style="border-color:var(--loss);">
+        <h2 class="section-title" style="font-size:14px;">Ya da: Daha Önceki Bir Yedeği Geri Yükle</h2>
+        <p class="muted" style="margin-bottom:12px;">Daha önce "Veriyi Dışa Aktar" ile aldığınız bir JSON yedeğiniz varsa, sıfırdan kurmak yerine buraya yapıştırıp doğrudan geri yükleyebilirsiniz.</p>
+        <textarea id="import-json-area-empty" placeholder="JSON'u buraya yapıştırın..." style="width:100%;height:140px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;"></textarea>
+        <button class="btn ghost" id="import-json-btn-empty" style="margin-top:10px;border-color:var(--loss);color:var(--loss);">JSON'u Yükle</button>
+        <span id="import-json-msg-empty" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
+      </div>
+    `;
+    const grid = document.getElementById('kurulum-inputs');
+    grid.innerHTML = TICKERS.map(t => `
+      <div class="field">
+        <label>${t} kapanış fiyatı (₺)</label>
+        <input type="number" step="0.01" min="0.01" id="kur-${t}" value="${SEED_PRICES[t]}">
+      </div>
+    `).join('');
+    document.getElementById('kur-btn').onclick = async () => {
+      const errEl = document.getElementById('kur-error');
+      errEl.textContent = '';
+      const setupDate = document.getElementById('kur-date').value;
+      if(!setupDate){ errEl.textContent = 'Kurulum tarihi girin.'; return; }
+      const ppfPct = parseFloat(document.getElementById('kur-ppf').value.toString().replace(',', '.')) || 0;
+      const prices = {};
+      for(const t of TICKERS){
+        const v = parseFloat(document.getElementById('kur-'+t).value);
+        if(!v || v<=0){ errEl.textContent = t+' için geçerli bir fiyat girin.'; return; }
+        prices[t] = v;
+      }
+      const positions = {};
+      let cash = CASH_BUDGET;
+      TICKERS.forEach(t => {
+        const qty = Math.floor(TARGET_PER_STOCK / prices[t]);
+        positions[t] = qty;
+        cash += TARGET_PER_STOCK - qty*prices[t];
+      });
+      state = {
+        initialized: true,
+        cash: cash,
+        cashCostBasis: cash,
+        totalStopajPaid: 0,
+        positions: positions,
+        positionCostBasis: Object.assign({}, prices),
+        realizedPnL: 0,
+        lastPrices: prices,
+        dailyPrices: Object.assign({}, prices),
+        dailyLog: [],
+        targetPerStock: TARGET_PER_STOCK,
+        cashThresholdPct: 70,
+        cashAnnualYieldPct: ppfPct,
+        lastInterestDate: setupDate,
+        cashInterestEarned: 0,
+        history: [{
+          date: setupDate,
+          totalValue: cash + TICKERS.reduce((s,t)=>s+positions[t]*prices[t],0),
+          cash: cash,
+          positions: Object.fromEntries(TICKERS.map(t=>[t,{price:prices[t],qty:positions[t],value:positions[t]*prices[t]}])),
+          transactions: [{note:'Kurulum'}]
+        }]
+      };
+      accrueCashInterest();
+      await saveState();
+      setTab('panel');
+    };
+    document.getElementById('import-json-btn-empty').onclick = (e) => confirmInline(e.currentTarget, 'Yapıştırdığınız JSON portföy olarak yüklenecek. Emin misiniz?', async () => {
+      const msgEl = document.getElementById('import-json-msg-empty');
+      const raw = document.getElementById('import-json-area-empty').value.trim();
+      let parsed;
+      try{
+        parsed = JSON.parse(raw);
+      }catch(err){
+        if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Geçersiz JSON.'; }
+        renderKurulum();
+        return;
+      }
+      if(!parsed || !parsed.initialized || !parsed.positions || !parsed.history){
+        if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Bu JSON bir portföy verisine benzemiyor.'; }
+        renderKurulum();
+        return;
+      }
+      state = parsed;
+      await saveState();
+      setTab('panel');
+    });
+  }
+
+  function renderPanel(){
+    const el = document.getElementById('panel-content');
+    if(!state || !state.initialized){
+      el.innerHTML = `<div class="card"><div class="empty">Henüz portföy kurulmadı.<br><br><button class="btn" onclick="document.querySelector('[data-tab=kurulum]').click()">Kuruluma Git</button></div></div>`;
+      return;
+    }
+    const earnedNow = accrueCashInterest();
+    if(earnedNow) saveState();
+    const total = currentValue();
+    const stockVal = total - state.cash;
+    const remaining = Math.max(0, GOAL - total);
+    el.innerHTML = `
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Toplam Varlık</div><div class="value">${fmt(total)}</div></div>
+        <div class="stat-card"><div class="label">Nakit</div><div class="value">${fmt(state.cash)}</div></div>
+        <div class="stat-card"><div class="label">Hisse Değeri</div><div class="value">${fmt(stockVal)}</div></div>
+        <div class="stat-card"><div class="label">Hedefe Kalan</div><div class="value">${fmt(remaining)}</div></div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Nakit / Hisse Dağılımı</h2>
+        ${renderAllocationChart(state.cash, stockVal, total)}
+      </div>
+      <div class="card">
+        <h2 class="section-title">Nakit Yönetimi</h2>
+        ${renderCashManagement(state.cash, stockVal, total)}
+      </div>
+      <div class="card">
+        <h2 class="section-title">Pozisyonlar</h2>
+        <table>
+          <thead><tr><th>Hisse</th><th>Adet</th><th>Fiyat</th><th>Değer</th><th>Hedef Farkı</th></tr></thead>
+          <tbody>${renderPositionRows()}</tbody>
+        </table>
+        <div class="note-box">Hedef bant: hisse başı ~${fmt(state.targetPerStock)}. Cuma kapanışı sonrası "Bu Hafta" sekmesinden fiyatları girip rotasyonu uygulayın.</div>
+      </div>
+    `;
+    document.getElementById('cash-settings-save').onclick = async () => {
+      const thresholdRaw = document.getElementById('cash-threshold-input').value.toString().replace(',', '.');
+      const ppfRaw = document.getElementById('ppf-rate-input').value.toString().replace(',', '.');
+      const thresholdV = parseFloat(thresholdRaw);
+      const ppfV = parseFloat(ppfRaw);
+      const msgEl = document.getElementById('cash-settings-msg');
+      let changed = [];
+      if(thresholdV && thresholdV>0 && thresholdV<100){
+        state.cashThresholdPct = thresholdV;
+        changed.push('eşik %'+thresholdV);
+      }
+      if(!isNaN(ppfV) && ppfV>=0){
+        state.cashAnnualYieldPct = ppfV;
+        changed.push('PPF %'+ppfV);
+      }
+      if(changed.length === 0){
+        msgEl.style.color = 'var(--loss)';
+        msgEl.textContent = '✕ Geçerli bir değer girilmedi.';
+        return;
+      }
+      accrueCashInterest();
+      await saveState();
+      msgEl.style.color = 'var(--gain)';
+      msgEl.textContent = '✓ Kaydedildi (' + changed.join(', ') + ')';
+      setTimeout(() => { renderPanel(); drawGauge(); }, 1100);
+    };
+    document.getElementById('recalc-history-btn').onclick = (e) => confirmInline(e.currentTarget, 'Kuruluştan bugüne tüm faiz geçmişi yeni oranla yeniden hesaplanacak. Emin misiniz?', async () => {
+      const ppfRaw = document.getElementById('ppf-rate-input').value.toString().replace(',', '.');
+      const ppfV = parseFloat(ppfRaw);
+      if(isNaN(ppfV) || ppfV<0){
+        renderPanel();
+        return;
+      }
+      const before = state.cashInterestEarned || 0;
+      recalculateInterestHistory(ppfV);
+      await saveState();
+      const after = state.cashInterestEarned || 0;
+      renderPanel();
+      const msgEl = document.getElementById('recalc-history-msg');
+      if(msgEl){
+        msgEl.style.color = 'var(--gain)';
+        msgEl.textContent = `✓ Yeniden hesaplandı: ${fmt(before)} → ${fmt(after)}`;
+      }
+    });
+    const applyBtn = document.getElementById('cash-apply-target');
+    if(applyBtn){
+      applyBtn.onclick = (e) => confirmInline(e.currentTarget, 'Hisse-başı hedef güncellenecek, bir sonraki rotasyonda uygulanacak. Emin misiniz?', async () => {
+        const total2 = currentValue();
+        const newTarget = total2 * 0.5 / TICKERS.length;
+        state.targetPerStock = newTarget;
+        await saveState();
+        renderPanel();
+      });
+    }
+  }
+
+  function renderAllocationChart(cash, stockVal, total){
+    const cashPct = total ? (cash/total*100) : 0;
+    const stockPct = total ? (stockVal/total*100) : 0;
+    const r = 58, cx = 74, cy = 74;
+    const circumference = 2 * Math.PI * r;
+    const cashLen = circumference * (cashPct/100);
+    const stockLen = circumference * (stockPct/100);
+    const cashColor = '#2FB380';
+    const stockColor = '#7FA3C9';
+    return `
+      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
+        <svg width="148" height="148" viewBox="0 0 148 148" style="flex-shrink:0;">
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#294869" stroke-width="18"/>
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${stockColor}" stroke-width="18"
+            stroke-dasharray="${stockLen.toFixed(1)} ${circumference.toFixed(1)}"
+            stroke-dashoffset="0" transform="rotate(-90 ${cx} ${cy})"/>
+          <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cashColor}" stroke-width="18"
+            stroke-dasharray="${cashLen.toFixed(1)} ${circumference.toFixed(1)}"
+            stroke-dashoffset="${-stockLen.toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>
+          <text x="${cx}" y="${cy-4}" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="17" font-weight="700" fill="#F1F5FA">%${stockPct.toFixed(0)}</text>
+          <text x="${cx}" y="${cy+14}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">HİSSE</text>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:14px;min-width:160px;">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <span style="width:11px;height:11px;border-radius:3px;background:${stockColor};display:inline-block;flex-shrink:0;"></span>
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;">Hisse Değeri</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;">${fmt(stockVal)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:12px;color:var(--ink-soft);">(%${stockPct.toFixed(1)})</span></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;">
+            <span style="width:11px;height:11px;border-radius:3px;background:${cashColor};display:inline-block;flex-shrink:0;"></span>
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;">Nakit</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;">${fmt(cash)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:12px;color:var(--ink-soft);">(%${cashPct.toFixed(1)})</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPendingSettlementsList(){
+    const today = new Date().toISOString().slice(0,10);
+    const active = (state.cashSettlements||[]).filter(s => today <= s.availableFrom);
+    if(active.length === 0) return '';
+    return `
+      <div class="note-box" style="margin-top:12px;">
+        <b>Takasta bekleyen tutarlar:</b>
+        <ul style="margin:8px 0 0 0;padding-left:18px;">
+          ${active.map(s => `<li>${s.rotationDate} rotasyonundan ${fmt(s.amount)} — ${s.availableFrom} sonrası faize dahil olacak</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  function renderCashManagement(cash, stockVal, total){
+    const cashPct = total ? (cash/total*100) : 0;
+    const threshold = state.cashThresholdPct;
+    const triggered = cashPct >= threshold;
+    const suggestedTarget = total * 0.5 / TICKERS.length;
+    const targetChanged = Math.round(suggestedTarget) !== Math.round(state.targetPerStock);
+    const ppfPct = state.cashAnnualYieldPct || 0;
+
+    let html = `
+      <p class="muted" style="margin-bottom:14px;">Nakit, aşağıdaki TEFAS "Son 1 Ay" getiri varsayımıyla (Garanti Portföy Birinci Para Piyasası Fonu, GTL) günlük bileşik faiz kazanır — girilen değer otomatik yıllıklandırılır. Oran sık değiştiği için her kontrolünüzde güncelleyin — 0 girerseniz faiz işlenmez.</p>
+      <div class="grid2">
+        <div class="field">
+          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Aylık %)</label>
+          <input type="number" step="0.01" min="0" id="ppf-rate-input" value="${ppfPct}">
+        </div>
+        <div class="field">
+          <label>Nakit Oranı Eşiği (%)</label>
+          <input type="number" step="1" min="1" max="99" id="cash-threshold-input" value="${threshold}">
+        </div>
+      </div>
+      <button class="btn ghost" id="cash-settings-save" style="margin-top:2px;">Ayarları Kaydet</button>
+      <span id="cash-settings-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gain);"></span>
+      <div class="stat-row" style="margin-top:16px;">
+        <div class="stat-card"><div class="label">Birikmiş PPF Faizi</div><div class="value diff-up">+${fmt(state.cashInterestEarned||0)}</div></div>
+        <div class="stat-card"><div class="label">Takasta Bekleyen (T+2)</div><div class="value">${fmt(pendingSettlementAmount(new Date().toISOString().slice(0,10), state.cashSettlements))}</div></div>
+        <div class="stat-card"><div class="label">Ödenen PPF Stopajı (%17,5)</div><div class="value diff-down">−${fmt(state.totalStopajPaid||0)}</div></div>
+      </div>
+      ${renderPendingSettlementsList()}
+      <div class="note-box" style="margin-top:16px;">
+        Oran yanlış girilmişse (örn. yıllık değer girilmiş olması gibi bir hata fark ettiyseniz): yukarıya doğru 1 aylık TEFAS değerini girip aşağıdaki butona basın. Bu, <b>kuruluştan bugüne kadar tüm faiz geçmişini</b> yeni oranla yeniden kurar — rotasyonlarda yaptığınız gerçek alım/satımların nakit etkisi korunur, sadece faiz kısmı düzeltilir. Normal oran güncellemesi (yukarıdaki "Ayarları Kaydet") sadece ileriye dönük çalışır; bu buton istisnai bir düzeltme aracıdır.
+      </div>
+      <button class="btn ghost" id="recalc-history-btn" style="margin-top:10px;border-color:var(--loss);color:var(--loss);">Geçmişi Bu Oranla Yeniden Hesapla</button>
+      <span id="recalc-history-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
+    `;
+
+    if(triggered && targetChanged){
+      html += `
+        <div class="note-box" style="margin-top:16px;border-color:var(--brass);">
+          Nakit oranı <b>%${cashPct.toFixed(1)}</b> — belirlediğiniz <b>%${threshold}</b> eşiğini aştı.<br>
+          %50/%50 dağılıma dönmek için önerilen yeni hisse-başı hedef: <b>${fmt(suggestedTarget)}</b> (mevcut: ${fmt(state.targetPerStock)}).<br>
+          Bu, bir sonraki "Bu Hafta" rotasyonunda otomatik olarak uygulanır — hemen alım yapmaz, sadece hedefi günceller.
+        </div>
+        <button class="btn" id="cash-apply-target" style="margin-top:10px;">Hedefi ${fmt(suggestedTarget)}'ye Güncelle</button>
+      `;
+    } else if(triggered && !targetChanged){
+      html += `<div class="note-box" style="margin-top:16px;">Nakit oranı eşiği aşmış durumda ama hedef zaten güncel.</div>`;
+    } else {
+      html += `<p class="muted" style="margin-top:14px;">Nakit oranı şu an %${cashPct.toFixed(1)} — eşiğin altında, bir işlem gerekmiyor.</p>`;
+    }
+    return html;
+  }
+
+  function renderPositionRows(){
+    let rows = '';
+    PAIRS.forEach(pair => {
+      rows += `<tr class="pair-divider"><td colspan="5"><span class="pair-tag">${pair.label}</span></td></tr>`;
+      [pair.a, pair.b].forEach(t => {
+        const qty = state.positions[t], price = (state.dailyPrices[t] ?? state.lastPrices[t]), val = qty*price;
+        const diff = val - state.targetPerStock;
+        const diffClass = diff >= 0 ? 'diff-up' : 'diff-down';
+        rows += `<tr>
+          <td class="tick-name">${t}</td>
+          <td>${fmtInt(qty)}</td>
+          <td>${fmt(price)}</td>
+          <td>${fmt(val)}</td>
+          <td class="${diffClass}">${diff>=0?'+':''}${fmt(diff)}</td>
+        </tr>`;
+      });
+    });
+    return rows;
+  }
+
+  function renderGunluk(){
+    const el = document.getElementById('gunluk-content');
+    if(!state || !state.initialized){
+      el.innerHTML = `<div class="card"><div class="empty">Önce portföyü kurun.</div></div>`;
+      return;
+    }
+    const earnedNow = accrueCashInterest();
+    if(earnedNow) saveState();
+    el.innerHTML = `
+      <div class="card">
+        <h2 class="section-title">Günlük Takip</h2>
+        <p class="muted">Sadece izleme amaçlıdır — burada girilen fiyatlar <b>alım/satım yapmaz</b>, pozisyonları ve nakdi değiştirmez. Son rotasyona (${state.history[state.history.length-1].date}) göre anlık kâr/zararı gösterir. Geçmişe dönük bir günü kaydetmek isterseniz tarihi değiştirin.</p>
+        <div class="field" style="max-width:220px;">
+          <label>Tarih</label>
+          <input type="date" id="gunluk-date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="grid2" id="gunluk-inputs"></div>
+        <button class="btn" id="gunluk-btn">Kâr / Zararı Göster</button>
+      </div>
+      <div id="gunluk-result"></div>
+    `;
+    const grid = document.getElementById('gunluk-inputs');
+    grid.innerHTML = TICKERS.map(t => `
+      <div class="field">
+        <label>${t} anlık fiyat (₺) <span style="opacity:.6;">— son rotasyon: ${fmt(state.lastPrices[t])}</span></label>
+        <input type="number" step="0.01" min="0.01" id="gunluk-${t}" value="${state.dailyPrices[t]}">
+      </div>
+    `).join('');
+
+    function computeAndShow(){
+      const prices = {};
+      for(const t of TICKERS){
+        const v = parseFloat(document.getElementById('gunluk-'+t).value);
+        prices[t] = (!v || v<=0) ? state.lastPrices[t] : v;
+      }
+      state.dailyPrices = prices;
+      saveState();
+
+      const stockValNow = TICKERS.reduce((s,t)=>s+state.positions[t]*prices[t],0);
+      const stockValBase = TICKERS.reduce((s,t)=>s+state.positions[t]*state.lastPrices[t],0);
+      const totalNow = state.cash + stockValNow;
+      const totalBase = state.cash + stockValBase;
+      const pnl = totalNow - totalBase;
+      const pnlPct = totalBase ? (pnl/totalBase*100) : 0;
+      const pnlClass = pnl >= 0 ? 'diff-up' : 'diff-down';
+
+      // Günlük K/Z: tam olarak son 1 güne ait değişim (nakit faizi gün gün izole edilir)
+      const dailyPnl = computeDailyPnl();
+      const dailyBaselineForPct = totalNow - dailyPnl;
+      const dailyPnlPct = dailyBaselineForPct ? (dailyPnl/dailyBaselineForPct*100) : 0;
+      const dailyClass = dailyPnl >= 0 ? 'diff-up' : 'diff-down';
+
+      // Toplam K/Z: kuruluştan bu yana (2.400.000 TL yatırılan sermayeye göre)
+      const totalPnl = totalNow - TOTAL_BUDGET;
+      const totalPnlPct = TOTAL_BUDGET ? (totalPnl/TOTAL_BUDGET*100) : 0;
+      const totalClass = totalPnl >= 0 ? 'diff-up' : 'diff-down';
+
+      let rows = '';
+      PAIRS.forEach(pair => {
+        rows += `<tr class="pair-divider"><td colspan="5"><span class="pair-tag">${pair.label}</span></td></tr>`;
+        [pair.a, pair.b].forEach(t => {
+          const qty = state.positions[t];
+          const priceNow = prices[t];
+          const priceBase = state.lastPrices[t];
+          const valNow = qty*priceNow;
+          const valBase = qty*priceBase;
+          const diff = valNow - valBase;
+          const diffClass = diff >= 0 ? 'diff-up' : 'diff-down';
+          rows += `<tr>
+            <td class="tick-name">${t}</td>
+            <td>${fmtInt(qty)}</td>
+            <td>${fmt(priceNow)}</td>
+            <td>${fmt(valNow)}</td>
+            <td class="${diffClass}">${diff>=0?'+':''}${fmt(diff)}</td>
+          </tr>`;
+        });
+      });
+
+      const resEl = document.getElementById('gunluk-result');
+      resEl.innerHTML = `
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="label">Son Rotasyona Göre K/Z</div>
+            <div class="value ${pnlClass}">${pnl>=0?'+':''}${fmt(pnl)}</div>
+            <div class="value-pct ${pnlClass}">${pnl>=0?'+':''}${pnlPct.toFixed(2)}%</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Günlük K/Z</div>
+            <div class="value ${dailyClass}">${dailyPnl>=0?'+':''}${fmt(dailyPnl)}</div>
+            <div class="value-pct ${dailyClass}">${dailyPnl>=0?'+':''}${dailyPnlPct.toFixed(2)}%</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Toplam K/Z</div>
+            <div class="value ${totalClass}">${totalPnl>=0?'+':''}${fmt(totalPnl)}</div>
+            <div class="value-pct ${totalClass}">${totalPnl>=0?'+':''}${totalPnlPct.toFixed(2)}%</div>
+          </div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Hisse</th><th>Adet</th><th>Anlık Fiyat</th><th>Anlık Değer</th><th>Son Rotasyona Göre</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <button class="btn" id="gunluk-kaydet-btn" style="margin-top:10px;">Bu Tarihi Kaydet</button>
+          <span id="gunluk-kaydet-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
+        </div>
+        ${renderDailyChartSection()}
+      `;
+      document.getElementById('gunluk-kaydet-btn').onclick = async () => {
+        const msgEl = document.getElementById('gunluk-kaydet-msg');
+        const chosenDate = document.getElementById('gunluk-date').value;
+        if(!chosenDate){
+          if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Tarih seçin.'; }
+          return;
+        }
+        const now = new Date();
+        const label = chosenDate + ' ' + now.toTimeString().slice(0,5);
+        state.dailyLog.push({date: label, totalValue: totalNow, cash: state.cash, stockValue: stockValNow, prices: Object.assign({}, prices)});
+        try{
+          await saveState();
+        }catch(err){
+          if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Kaydedilemedi: ' + (err && err.message || 'bilinmeyen hata'); }
+          return;
+        }
+        computeAndShow();
+        setTimeout(() => {
+          const m = document.getElementById('gunluk-kaydet-msg');
+          if(m){ m.style.color = 'var(--gain)'; m.textContent = '✓ ' + chosenDate + ' kaydedildi'; }
+        }, 50);
+      };
+      document.querySelectorAll('.chart-toggle-btn').forEach(btn => {
+        btn.onclick = () => {
+          dailyChartMode = btn.getAttribute('data-mode');
+          computeAndShow();
+        };
+      });
+      if(dailyChartMode === 'genel'){
+        wireChartTooltips('daily-chart-wrap', 'daily-chart-tooltip');
+      } else {
+        wirePositionsTooltips();
+      }
+      drawGauge();
+    }
+
+    document.getElementById('gunluk-btn').onclick = computeAndShow;
+    computeAndShow();
+  }
+
+  function renderDailyChartSection(){
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+          <h2 class="section-title" style="font-size:15px;margin:0;">${dailyChartMode==='genel' ? 'Günlük Genel Seyir' : 'Pozisyonlar'}</h2>
+          <div style="display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:3px;">
+            <button type="button" class="chart-toggle-btn" data-mode="genel" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${dailyChartMode==='genel'?'var(--brass)':'transparent'};color:${dailyChartMode==='genel'?'#062318':'var(--ink-soft)'};">Genel</button>
+            <button type="button" class="chart-toggle-btn" data-mode="pozisyonlar" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${dailyChartMode==='pozisyonlar'?'var(--brass)':'transparent'};color:${dailyChartMode==='pozisyonlar'?'#062318':'var(--ink-soft)'};">Pozisyonlar</button>
+          </div>
+        </div>
+        ${dailyChartMode==='genel' ? renderDailyChartGenel() : renderPositionsChart()}
+      </div>
+    `;
+  }
+
+  function renderDailyChartGenel(){
+    const byDate = {};
+    state.history.forEach(h => { byDate[h.date] = h.totalValue; });
+    (state.dailyLog||[]).forEach(d => { byDate[d.date.slice(0,10)] = d.totalValue; });
+    const merged = Object.keys(byDate).sort().map(date => ({date, totalValue: byDate[date]}));
+    if(merged.length === 0){
+      return `<p class="muted">Henüz günlük kayıt yok. "Bu Tarihi Kaydet" ile trend grafiğini oluşturmaya başlayın.</p>`;
+    }
+    const log = merged.slice(-30);
+    const pnlVals = log.map(p=>p.totalValue - TOTAL_BUDGET);
+    let maxV = Math.max(0, ...pnlVals);
+    let minV = Math.min(0, ...pnlVals);
+    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.1, 500);
+    maxV += pad;
+    minV -= pad;
+    const w = 640, h = 150, padL=60, padR=15, padT=15, padB=26;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const xFor = (i) => padL + (log.length===1 ? plotW/2 : i/(log.length-1)*plotW);
+    const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+    const zeroY = yFor(0);
+    const zeroPath = `M ${padL} ${zeroY.toFixed(1)} L ${(w-padR).toFixed(1)} ${zeroY.toFixed(1)}`;
+    let path = log.map((pt,i) => `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yFor(pt.totalValue - TOTAL_BUDGET).toFixed(1)}`).join(' ');
+    let dots = log.map((pt,i) => `<circle class="pnl-dot" cx="${xFor(i).toFixed(1)}" cy="${yFor(pt.totalValue - TOTAL_BUDGET).toFixed(1)}" r="4.5" fill="#2FB380" stroke="#0A1628" stroke-width="1.2" data-date="${pt.date}" data-invested="${TOTAL_BUDGET}" data-pnl="${pt.totalValue - TOTAL_BUDGET}"/>`).join('');
+    return `
+      <div class="chart-wrap" id="daily-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <path d="${zeroPath}" fill="none" stroke="#7FA3C9" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="${padL-6}" y="${zeroY.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#7FA3C9">0</text>
+          <path d="${path}" fill="none" stroke="#4FCB98" stroke-width="2"/>
+          ${dots}
+        </svg>
+        <div class="chart-tooltip" id="daily-chart-tooltip"></div>
+      </div>
+    `;
+  }
+
+  function renderPositionsChart(){
+    // Kasıtlı olarak SADECE bundan sonra "Bu Tarihi Kaydet" ile hisse fiyatı da
+    // içeren günlük kayıtları kullanıyoruz — kuruluş (31 Temmuz) ve eski (fiyatsız)
+    // günlük kayıtlar bu grafiğe hiç dahil edilmiyor. İlk yeni kayıt, çizginin
+    // sıfır (%0) başlangıç noktası olur.
+    const byDate = {};
+    (state.dailyLog||[]).forEach(d => {
+      if(d.prices){
+        const dk = d.date.slice(0,10);
+        byDate[dk] = Object.assign(byDate[dk]||{}, d.prices);
+      }
+    });
+    const dates = Object.keys(byDate).sort().slice(-30);
+    if(dates.length === 0){
+      return `<p class="muted">Henüz veri yok. Bugünden itibaren "Bu Tarihi Kaydet" ile kayıt yaptıkça bu grafik oluşmaya başlayacak (eski kayıtlar dahil edilmiyor).</p>`;
+    }
+    // Her hisse için baz fiyat: bu grafikte ilk göründüğü (en eski YENİ) kayıt
+    const baseline = {};
+    TICKERS.forEach(t => {
+      for(const d of dates){
+        if(byDate[d][t] !== undefined){ baseline[t] = byDate[d][t]; break; }
+      }
+    });
+
+    const w = 640, h = 170, padL=50, padR=15, padT=15, padB=26;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const xFor = (i) => padL + (dates.length===1 ? plotW/2 : i/(dates.length-1)*plotW);
+
+    // PPF (nakit) referans serisi: kayıtlı günlük orana göre, saf bileşik büyüme
+    // endeksi — alım/satım nakit akışlarından bağımsız, "sadece nakitte kalsaydım
+    // ne olurdu" karşılaştırması için.
+    const ppfRate = (state.cashAnnualYieldPct||0) > 0 ? Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1 : 0;
+    const firstDate = dates[0];
+    const ppfPctByDate = {};
+    dates.forEach(d => {
+      const daysDiff = Math.round((new Date(d+'T00:00:00Z') - new Date(firstDate+'T00:00:00Z')) / 86400000);
+      ppfPctByDate[d] = (Math.pow(1+ppfRate, daysDiff) - 1) * 100;
+    });
+
+    // Tüm yüzde değerlerini toplayıp ölçeği belirle
+    let allPct = [];
+    TICKERS.forEach(t => {
+      if(!baseline[t]) return;
+      dates.forEach(d => {
+        const p = byDate[d][t];
+        if(p !== undefined) allPct.push((p/baseline[t]-1)*100);
+      });
+    });
+    dates.forEach(d => allPct.push(ppfPctByDate[d]));
+    let maxV = Math.max(0, ...allPct);
+    let minV = Math.min(0, ...allPct);
+    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.15, 2);
+    maxV += pad; minV -= pad;
+    const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+    const zeroY = yFor(0);
+
+    let paths = '';
+    let allDots = '';
+    TICKERS.forEach(t => {
+      if(!baseline[t]) return;
+      const color = TICKER_COLORS[t];
+      let d = '';
+      let started = false;
+      let dots = '';
+      dates.forEach((date, i) => {
+        const p = byDate[date][t];
+        if(p === undefined){ started = false; return; }
+        const pct = (p/baseline[t]-1)*100;
+        const qty = state.positions[t] || 0;
+        const tlDiff = qty * (p - baseline[t]);
+        const x = xFor(i).toFixed(1), y = yFor(pct).toFixed(1);
+        d += (started ? 'L' : 'M') + ' ' + x + ' ' + y + ' ';
+        started = true;
+        dots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="3.5" fill="${color}" stroke="#0A1628" stroke-width="1" data-ticker="${t}" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>${t} · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
+      });
+      paths += `<path d="${d.trim()}" fill="none" stroke="${color}" stroke-width="2"/>`;
+      allDots += dots;
+    });
+
+    // PPF (nakit) referans çizgisi — kesikli, ayrı renk
+    const PPF_COLOR = '#F1F5FA';
+    let ppfPath = '';
+    let ppfDots = '';
+    dates.forEach((date, i) => {
+      const pct = ppfPctByDate[date];
+      const x = xFor(i).toFixed(1), y = yFor(pct).toFixed(1);
+      const tlDiff = state.cash * (pct/100);
+      ppfPath += (i===0 ? 'M' : 'L') + ' ' + x + ' ' + y + ' ';
+      ppfDots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="3" fill="${PPF_COLOR}" stroke="#0A1628" stroke-width="1" data-ticker="PPF (Nakit)" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>PPF (Nakit) · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
+    });
+    paths += `<path d="${ppfPath.trim()}" fill="none" stroke="${PPF_COLOR}" stroke-width="1.8" stroke-dasharray="5 4"/>`;
+    allDots += ppfDots;
+
+    const legend = TICKERS.map(t => `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="width:11px;height:3px;background:${TICKER_COLORS[t]};display:inline-block;border-radius:2px;"></span>
+        <span class="muted" style="font-size:11px;">${t}</span>
+      </div>
+    `).join('') + `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="width:11px;height:3px;background:${PPF_COLOR};display:inline-block;border-radius:2px;"></span>
+        <span class="muted" style="font-size:11px;">PPF (Nakit)</span>
+      </div>
+    `;
+
+    return `
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">${legend}</div>
+      <div class="chart-wrap" id="positions-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" stroke="#4A5A50" stroke-width="1" stroke-dasharray="4 3"/>
+          <text x="${padL-6}" y="${zeroY}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">%0</text>
+          ${paths}
+          ${allDots}
+        </svg>
+        <div class="chart-tooltip" id="positions-chart-tooltip"></div>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:8px;">Her çizgi, ilgili hissenin bu grafikteki ilk kayıtlı (bugünden itibaren) fiyatına göre yüzde değişimini gösterir. Eski/kuruluş verisi dahil edilmez. Kesikli beyaz çizgi (PPF/Nakit), güncel oranla saf bileşik büyümeyi gösterir — alım/satım nakit akışlarından bağımsız bir referanstır, gerçek nakit bakiyenizle birebir aynı olmayabilir.</p>
+    `;
+  }
+
+  function wirePositionsTooltips(){
+    const wrap = document.getElementById('positions-chart-wrap');
+    const tip = document.getElementById('positions-chart-tooltip');
+    if(!wrap || !tip) return;
+    const showTip = (dot, clientX, clientY) => {
+      const rect = wrap.getBoundingClientRect();
+      const ticker = dot.getAttribute('data-ticker');
+      const date = dot.getAttribute('data-date');
+      const pct = parseFloat(dot.getAttribute('data-pct'));
+      const tl = parseFloat(dot.getAttribute('data-tl'));
+      tip.innerHTML = `
+        <span class="tt-date">${ticker} · ${date}</span>
+        <div class="tt-row"><span>K/Z %</span><span style="color:${pct>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${pct>=0?'+':''}${pct.toFixed(2)}%</span></div>
+        <div class="tt-row"><span>K/Z ₺</span><span style="color:${tl>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${tl>=0?'+':''}${fmt(tl)}</span></div>
+      `;
+      tip.style.left = (clientX - rect.left) + 'px';
+      tip.style.top = (clientY - rect.top) + 'px';
+      tip.classList.add('visible');
+    };
+    wrap.querySelectorAll('.pos-dot').forEach(dot => {
+      dot.style.cursor = 'pointer';
+      dot.addEventListener('mouseenter', (e) => showTip(dot, e.clientX, e.clientY));
+      dot.addEventListener('mousemove', (e) => showTip(dot, e.clientX, e.clientY));
+      dot.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+      dot.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        showTip(dot, t.clientX, t.clientY);
+        setTimeout(() => tip.classList.remove('visible'), 2200);
+      }, {passive:false});
+    });
+  }
+
+  function renderHafta(){
+    const el = document.getElementById('hafta-content');
+    if(!state || !state.initialized){
+      el.innerHTML = `<div class="card"><div class="empty">Önce portföyü kurun.</div></div>`;
+      return;
+    }
+    el.innerHTML = `
+      ${state.undoSnapshot ? `
+      <div class="card" style="border-color:var(--loss);">
+        <p class="muted" style="margin:0;">Son uygulanan rotasyonu geri alabilirsiniz — portföy bir önceki pozisyona döner.</p>
+        <button class="btn ghost" id="undo-btn-persist" style="margin-top:10px;">Son Rotasyonu Geri Al</button>
+      </div>
+      ` : ''}
+      <div class="card">
+        <h2 class="section-title">Bu Hafta</h2>
+        <p class="muted">Cuma kapanış fiyatlarını girin. Değeri hedef bandın (~${fmt(state.targetPerStock)}) üzerine çıkanlar bu tutara kadar satılır, altına düşenler ortak nakit havuzundan alım yapılarak tamamlanır (nakit yetmezse kısmi alım yapılır). Kâr eden bir hisseden gelen nakit, hangi hissenin zararını kapatacağıyla sınırlı değildir — tüm satışlar önce ortak havuza girer, sonra tüm alımlar bu havuzdan yapılır.</p>
+        <div class="field" style="max-width:220px;">
+          <label>İşlem Tarihi (Cuma)</label>
+          <input type="date" id="hafta-date" value="${nextFriday()}">
+        </div>
+        <div id="hafta-date-warning" style="margin-bottom:12px;"></div>
+        <div class="grid2" id="hafta-inputs"></div>
+        <button class="btn" id="hafta-btn">Haftalık Rotasyonu Uygula</button>
+        <div id="hafta-error" style="color:var(--loss);font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:8px;"></div>
+        <div id="hafta-result"></div>
+      </div>
+    `;
+    if(state.undoSnapshot){
+      document.getElementById('undo-btn-persist').onclick = (e) => confirmInline(e.currentTarget, 'Son rotasyon geri alınacak, emin misiniz?', performUndo);
+    }
+    const grid = document.getElementById('hafta-inputs');
+    grid.innerHTML = TICKERS.map(t => `
+      <div class="field">
+        <label>${t} kapanış fiyatı (₺) <span style="opacity:.6;">— önceki: ${fmt(state.lastPrices[t])}</span></label>
+        <input type="number" step="0.01" min="0.01" id="hafta-${t}" value="${state.dailyPrices[t] ?? state.lastPrices[t]}">
+      </div>
+    `).join('');
+    function checkHaftaDateWarning(){
+      const warnEl = document.getElementById('hafta-date-warning');
+      if(!warnEl) return;
+      const val = document.getElementById('hafta-date').value;
+      if(!val){ warnEl.innerHTML = ''; return; }
+      const dow = new Date(val + 'T00:00:00Z').getUTCDay(); // 5 = Cuma
+      if(dow !== 5){
+        const gunler = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+        warnEl.innerHTML = `<div class="note-box" style="border-color:var(--loss);">⚠ Seçili tarih (${val}) bir <b>${gunler[dow]}</b> günü, Cuma değil. Rotasyonu geriye dönük giriyorsanız tarihi kontrol edin.</div>`;
+      } else {
+        warnEl.innerHTML = '';
+      }
+    }
+    document.getElementById('hafta-date').addEventListener('change', checkHaftaDateWarning);
+    checkHaftaDateWarning();
+    document.getElementById('hafta-btn').onclick = async () => {
+      const errEl = document.getElementById('hafta-error');
+      errEl.textContent = '';
+      const prices = {};
+      for(const t of TICKERS){
+        const v = parseFloat(document.getElementById('hafta-'+t).value);
+        if(!v || v<=0){ errEl.textContent = t+' için geçerli bir fiyat girin.'; return; }
+        prices[t] = v;
+      }
+      const date = document.getElementById('hafta-date').value || nextFriday();
+      const preSnapshot = JSON.parse(JSON.stringify({
+        cash: state.cash,
+        cashCostBasis: state.cashCostBasis !== undefined ? state.cashCostBasis : state.cash,
+        totalStopajPaid: state.totalStopajPaid || 0,
+        positions: state.positions,
+        positionCostBasis: state.positionCostBasis || {},
+        realizedPnL: state.realizedPnL || 0,
+        lastPrices: state.lastPrices,
+        dailyPrices: state.dailyPrices,
+        history: state.history,
+        cashSettlements: state.cashSettlements || []
+      }));
+      let cash = state.cash;
+      let costBasis = state.cashCostBasis !== undefined ? state.cashCostBasis : state.cash;
+      let totalStopajPaid = 0;
+      const posCostBasis = Object.assign({}, state.positionCostBasis);
+      let realizedPnL = state.realizedPnL || 0;
+      const positions = Object.assign({}, state.positions);
+      const txByTicker = {};
+      const sellList = [], buyList = [];
+
+      // Önce hangi hisselerin satılacağı/alınacağı belirlenir (henüz işlem yapılmaz)
+      TICKERS.forEach(t => {
+        const price = prices[t];
+        const qty = positions[t];
+        const targetQty = Math.floor(state.targetPerStock / price);
+        if(targetQty < qty) sellList.push({t, targetQty, price});
+        else if(targetQty > qty) buyList.push({t, targetQty, price});
+        else txByTicker[t] = {ticker:t, action:'YOK', qty:0, price:price, amount:0, note:'Zaten hedefte'};
+      });
+
+      // 1) Tüm satışlar uygulanır — elde edilen nakit ortak havuza (cash) eklenir.
+      //    Bu aşamada hangi hissenin karını hangi hissenin telafi ettiği önemli değildir.
+      sellList.forEach(({t, targetQty, price}) => {
+        const qty = positions[t];
+        const sellQty = qty - targetQty;
+        const proceeds = sellQty * price;
+        cash += proceeds;
+        costBasis += proceeds; // hisse satışından gelen para henüz PPF kârı içermiyor, saf ana para
+        const avgCost = posCostBasis[t] !== undefined ? posCostBasis[t] : price;
+        realizedPnL += (price - avgCost) * sellQty; // bu satışta gerçekleşen (kapanan) kâr/zarar
+        positions[t] = targetQty;
+        txByTicker[t] = {ticker:t, action:'SAT', qty:sellQty, price:price, amount:proceeds, realized:(price-avgCost)*sellQty};
+      });
+
+      // 2) Tüm alımlar, satışlarla zenginleşmiş aynı ortak nakit havuzundan karşılanır.
+      //    Nakit havuzundan çıkış = GTL (PPF) satışı demek — o anki nakdin ne kadarının
+      //    "kâr" (biriken faiz) olduğu oranında, sadece o kâr kısmı üzerinden %17,5 stopaj
+      //    kesiliyor (anaparadan değil).
+      const STOPAJ_ORANI = 0.175;
+      buyList.forEach(({t, targetQty, price}) => {
+        const qty = positions[t];
+        const needQty = targetQty - qty;
+        const cost = needQty * price;
+        const gainRatio = cash > 0 ? Math.max(0, Math.min(1, (cash - costBasis) / cash)) : 0;
+        const stopaj = cost * gainRatio * STOPAJ_ORANI;
+        if(cash >= cost + stopaj){
+          cash -= (cost + stopaj);
+          costBasis -= cost * (1 - gainRatio); // cekilen tutarin anapara kismi kadar ana para da azalir
+          totalStopajPaid += stopaj;
+          const oldQty = qty, newQty = targetQty;
+          const oldAvg = posCostBasis[t] !== undefined ? posCostBasis[t] : price;
+          posCostBasis[t] = newQty>0 ? (oldQty*oldAvg + needQty*price) / newQty : price;
+          positions[t] = targetQty;
+          txByTicker[t] = {ticker:t, action:'AL', qty:needQty, price:price, amount:cost, stopaj:stopaj};
+        } else {
+          // Stopaj dahil efektif birim fiyat üzerinden kaç adet alınabileceğini bul
+          const effectivePrice = price * (1 + gainRatio * STOPAJ_ORANI);
+          const affordable = Math.floor(cash / effectivePrice);
+          if(affordable > 0){
+            const affordableCost = affordable * price;
+            const affordableStopaj = affordableCost * gainRatio * STOPAJ_ORANI;
+            cash -= (affordableCost + affordableStopaj);
+            costBasis -= affordableCost * (1 - gainRatio);
+            totalStopajPaid += affordableStopaj;
+            const oldQty = qty, newQty = qty + affordable;
+            const oldAvg = posCostBasis[t] !== undefined ? posCostBasis[t] : price;
+            posCostBasis[t] = newQty>0 ? (oldQty*oldAvg + affordable*price) / newQty : price;
+            positions[t] = qty + affordable;
+            txByTicker[t] = {ticker:t, action:'AL', qty:affordable, price:price, amount:affordableCost, stopaj:affordableStopaj, note:'Nakit yetersiz, kısmi alım (stopaj dahil)'};
+          } else {
+            txByTicker[t] = {ticker:t, action:'YOK', qty:0, price:price, amount:0, note:'Nakit yetersiz'};
+          }
+        }
+      });
+
+      const transactions = TICKERS.map(t => txByTicker[t]);
+
+      // T+2 takas: bu rotasyondaki toplam SATIŞ tutarı, 2 iş günü boyunca PPF faizine
+      // dahil edilmeyecek şekilde kaydediliyor (gerçek Takasbank süreciyle uyumlu).
+      const totalSatProceeds = transactions.filter(tx => tx.action === 'SAT').reduce((s,tx) => s + tx.amount, 0);
+      if(totalSatProceeds > 0){
+        if(!state.cashSettlements) state.cashSettlements = [];
+        state.cashSettlements.push({
+          rotationDate: date,
+          amount: totalSatProceeds,
+          availableFrom: addBusinessDays(date, 2)
+        });
+      }
+
+      const totalValue = cash + TICKERS.reduce((s,t)=>s+positions[t]*prices[t],0);
+      state.cash = cash;
+      state.cashCostBasis = costBasis;
+      state.totalStopajPaid = (state.totalStopajPaid||0) + totalStopajPaid;
+      state.positionCostBasis = posCostBasis;
+      state.realizedPnL = realizedPnL;
+      state.positions = positions;
+      state.lastPrices = prices;
+      state.dailyPrices = Object.assign({}, prices);
+      state.undoSnapshot = preSnapshot;
+      state.history.push({
+        date: date,
+        totalValue: totalValue,
+        cash: cash,
+        positions: Object.fromEntries(TICKERS.map(t=>[t,{price:prices[t],qty:positions[t],value:positions[t]*prices[t]}])),
+        transactions: transactions
+      });
+      await saveState();
+
+      const resEl = document.getElementById('hafta-result');
+      resEl.innerHTML = `
+        <div class="note-box">${date} rotasyonu uygulandı. Yeni toplam varlık: <b>${fmt(totalValue)}</b>${totalStopajPaid>0 ? ` — PPF kârından kesilen stopaj: <b style="color:var(--loss);">${fmt(totalStopajPaid)}</b>` : ''}</div>
+        <ul class="txn-list">
+          ${transactions.map(tx => `
+            <li>
+              <span>${tx.ticker} ${tx.note?('· '+tx.note):''}</span>
+              <span><span class="txn-tag ${tx.action}">${tx.action}</span> ${tx.qty>0?fmtInt(tx.qty)+' adet · '+fmt(tx.price)+' · '+fmt(tx.amount)+(tx.stopaj?' · stopaj '+fmt(tx.stopaj):''):''}</span>
+            </li>
+          `).join('')}
+        </ul>
+        <button class="btn ghost" id="undo-btn-inline" style="margin-top:14px;">Bu Rotasyonu Geri Al</button>
+      `;
+      document.getElementById('undo-btn-inline').onclick = (e) => confirmInline(e.currentTarget, 'Bu rotasyon geri alınacak, emin misiniz?', performUndo);
+      renderPanel();
+      drawGauge();
+    };
+  }
+
+  function confirmInline(btn, message, onConfirm){
+    const wrap = document.createElement('span');
+    wrap.style.display = 'inline-flex';
+    wrap.style.gap = '10px';
+    wrap.style.alignItems = 'center';
+    wrap.style.flexWrap = 'wrap';
+    wrap.style.marginTop = '8px';
+    wrap.innerHTML = `
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--loss);">${message}</span>
+      <button type="button" class="btn ghost" style="margin-top:0;padding:9px 14px;">Evet, Onayla</button>
+      <button type="button" class="btn" style="margin-top:0;padding:9px 14px;background:var(--panel-2);color:var(--ink);">Vazgeç</button>
+    `;
+    const yesBtn = wrap.children[1];
+    const noBtn = wrap.children[2];
+    btn.replaceWith(wrap);
+    yesBtn.onclick = onConfirm;
+    noBtn.onclick = () => render();
+  }
+
+  async function performUndo(){
+    if(!state || !state.undoSnapshot) return;
+    const snap = state.undoSnapshot;
+    state.cash = snap.cash;
+    state.cashCostBasis = snap.cashCostBasis !== undefined ? snap.cashCostBasis : snap.cash;
+    state.totalStopajPaid = snap.totalStopajPaid || 0;
+    state.positions = snap.positions;
+    state.positionCostBasis = snap.positionCostBasis || {};
+    state.realizedPnL = snap.realizedPnL || 0;
+    state.lastPrices = snap.lastPrices;
+    state.dailyPrices = snap.dailyPrices;
+    state.history = snap.history;
+    state.cashSettlements = snap.cashSettlements || [];
+    state.undoSnapshot = null;
+    await saveState();
+    setTab('hafta');
+  }
+
+  function renderGecmis(){
+    const el = document.getElementById('gecmis-content');
+    if(!state || !state.initialized || state.history.length===0){
+      el.innerHTML = `<div class="card"><div class="empty">Henüz geçmiş kayıt yok.</div></div>`;
+      return;
+    }
+    const hist = state.history;
+    const maxV = Math.max(GOAL, ...hist.map(h=>h.totalValue)) * 1.05;
+    const minV = 0;
+    const w = 640, h = 190, padL=60, padR=15, padT=15, padB=28;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const xFor = (i) => padL + (hist.length===1 ? plotW/2 : i/(hist.length-1)*plotW);
+    const yFor = (v) => padT + plotH - ((v-minV)/(maxV-minV))*plotH;
+    const goalY = yFor(GOAL);
+    let path = hist.map((pt,i) => `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yFor(pt.totalValue).toFixed(1)}`).join(' ');
+    let dots = hist.map((pt,i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(pt.totalValue).toFixed(1)}" r="3.5" fill="#2FB380" stroke="#0A1628" stroke-width="1"/>`).join('');
+
+    const rowsHtml = hist.map((pt, idx) => {
+      const isKurulum = pt.transactions && pt.transactions.length===1 && pt.transactions[0].note==='Kurulum';
+      let detailContent;
+      if(isKurulum){
+        const posRows = TICKERS.map(t => {
+          const p = pt.positions && pt.positions[t];
+          if(!p) return '';
+          return `<li><span>${t}</span><span>${fmtInt(p.qty)} adet · ${fmt(p.price)} · ${fmt(p.value)}</span></li>`;
+        }).join('');
+        detailContent = `
+          <p class="muted" style="padding:10px 4px 4px 4px;margin:0;">Kuruluş işlemi — ${fmtInt(TICKERS.length)} hissede eşit ağırlıklı ilk alım.</p>
+          <ul class="txn-list" style="margin:0;">${posRows}</ul>
+        `;
+      } else if(pt.transactions && pt.transactions.length){
+        detailContent = `<ul class="txn-list" style="margin:0;">
+          ${pt.transactions.map(tx => `
+            <li>
+              <span>${tx.ticker || ''} ${tx.note?('· '+tx.note):''}</span>
+              <span>${tx.action ? `<span class="txn-tag ${tx.action}">${tx.action}</span>` : ''} ${tx.qty>0?fmtInt(tx.qty)+' adet · '+fmt(tx.price)+' · '+fmt(tx.amount)+(tx.stopaj?' · stopaj '+fmt(tx.stopaj):''):''}</span>
+            </li>
+          `).join('')}
+        </ul>`;
+      } else {
+        detailContent = `<p class="muted" style="padding:10px 4px;margin:0;">Bu kayıt için işlem detayı bulunmuyor.</p>`;
+      }
+      return `
+        <tr class="hist-row" data-idx="${idx}" style="cursor:pointer;">
+          <td style="text-align:left;">▸ ${pt.date}</td><td>${fmt(pt.totalValue)}</td><td>${fmt(pt.cash)}</td><td>${fmt(pt.totalValue-pt.cash)}</td>
+        </tr>
+        <tr class="hist-detail" id="hist-detail-${idx}" style="display:none;">
+          <td colspan="4" style="background:var(--bg-2);border-radius:8px;">
+            ${detailContent}
+            <div style="padding:10px 4px 4px 4px;border-top:1px dashed var(--line);margin-top:8px;">
+              <label style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Tarih yanlışsa düzeltin</label>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+                <input type="date" id="hist-date-edit-${idx}" value="${pt.date}" style="font-family:'IBM Plex Mono',monospace;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg-2);color:var(--ink);">
+                <button type="button" class="btn ghost hist-date-save-btn" data-idx="${idx}" style="margin-top:0;padding:7px 12px;font-size:12px;">Tarihi Kaydet</button>
+                <span id="hist-date-msg-${idx}" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;"></span>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).reverse().join('');
+
+    el.innerHTML = `
+      <div class="card">
+        <h2 class="section-title">Geçmiş</h2>
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${goalY}" x2="${w-padR}" y2="${goalY}" stroke="#E0684F" stroke-width="1" stroke-dasharray="4 3"/>
+          <text x="${w-padR}" y="${goalY-5}" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="#E0684F">Hedef 10.000.000 ₺</text>
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <path d="${path}" fill="none" stroke="#4FCB98" stroke-width="2"/>
+          ${dots}
+        </svg>
+        <p class="muted" style="margin-top:14px;font-size:11.5px;">Bir satıra tıklayarak o haftaki alım/satım detaylarını görebilirsiniz.</p>
+        <table style="margin-top:4px;">
+          <thead><tr><th>Tarih</th><th>Toplam Varlık</th><th>Nakit</th><th>Hisse Değeri</th></tr></thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </div>
+    `;
+    document.querySelectorAll('.hist-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const idx = row.getAttribute('data-idx');
+        const detail = document.getElementById('hist-detail-'+idx);
+        const isOpen = detail.style.display !== 'none';
+        detail.style.display = isOpen ? 'none' : 'table-row';
+        row.querySelector('td').textContent = (isOpen ? '▸ ' : '▾ ') + hist[idx].date;
+      });
+    });
+    document.querySelectorAll('.hist-date-save-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-idx'));
+        const newDate = document.getElementById('hist-date-edit-'+idx).value;
+        const msgEl = document.getElementById('hist-date-msg-'+idx);
+        if(!newDate){
+          if(msgEl){ msgEl.style.color = 'var(--loss)'; msgEl.textContent = '✕ Geçerli bir tarih girin.'; }
+          return;
+        }
+        state.history[idx].date = newDate;
+        await saveState();
+        if(msgEl){ msgEl.style.color = 'var(--gain)'; msgEl.textContent = '✓ Kaydedildi'; }
+        setTimeout(() => renderGecmis(), 700);
+      });
+    });
+  }
+
+  function renderIstatistik(){
+    const el = document.getElementById('istatistik-content');
+    if(!state || !state.initialized || state.history.length===0){
+      el.innerHTML = `<div class="card"><div class="empty">Henüz istatistik için yeterli veri yok.</div></div>`;
+      return;
+    }
+    // Realize edilmiş (kapalı pozisyon) kâr/zararı state'ten al (her rotasyonda güncelleniyor)
+    let closedCount = 0;
+    state.history.forEach(h => (h.transactions||[]).forEach(tx => {
+      if(tx.action === 'SAT'){ closedCount++; }
+    }));
+    const realizedTotal = state.realizedPnL || 0;
+    const realizedClass = realizedTotal >= 0 ? 'diff-up' : 'diff-down';
+
+    const series = state.history.map(h => ({ date: h.date, invested: TOTAL_BUDGET, pnl: h.totalValue - TOTAL_BUDGET }));
+    // Anlık günlük fiyatlarla "şimdi" noktasını ekle (resmi geçmişe kaydedilmemiş, sadece görüntü için)
+    const stockValNow = TICKERS.reduce((s,t)=>s+state.positions[t]*(state.dailyPrices[t]||state.lastPrices[t]),0);
+    const nowTotal = state.cash + stockValNow;
+    if(nowTotal !== state.history[state.history.length-1].totalValue){
+      series.push({date:'Şimdi', invested: TOTAL_BUDGET, pnl: nowTotal - TOTAL_BUDGET});
+    }
+
+    const latestPnl = series[series.length-1].pnl;
+    const latestPct = (latestPnl/TOTAL_BUDGET*100);
+    const pnlClass = latestPnl >= 0 ? 'diff-up' : 'diff-down';
+
+    el.innerHTML = `
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Toplam Yatırılan</div><div class="value">${fmt(TOTAL_BUDGET)}</div></div>
+        <div class="stat-card"><div class="label">Güncel Kâr/Zarar</div><div class="value ${pnlClass}">${latestPnl>=0?'+':''}${fmt(latestPnl)}</div></div>
+        <div class="stat-card"><div class="label">Getiri %</div><div class="value ${pnlClass}">${latestPnl>=0?'+':''}${latestPct.toFixed(2)}%</div></div>
+        <div class="stat-card" style="text-align:center;"><div class="label">Kapatılan Pozisyon K/Z</div><div class="value ${realizedClass}">${realizedTotal>=0?'+':''}${fmt(realizedTotal)}</div><div class="value-pct" style="color:var(--ink-soft);">${closedCount} işlem</div></div>
+      </div>
+      <div class="card">
+        <h2 class="section-title">Yatırılan &amp; Kâr/Zarar</h2>
+        <p class="muted" style="margin-bottom:10px;">Kâr/zarar çizgisi kapalı (satılmış) pozisyonlardan gerçekleşen kazanç/kaybı da içerir — toplam varlık ile yatırılan sermaye arasındaki farktır.</p>
+        <div style="display:flex;gap:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:3px;background:#7FA3C9;display:inline-block;border-radius:2px;"></span><span class="muted" style="font-size:12px;">Sıfır Referansı (Yatırılan)</span></div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:3px;background:${latestPnl>=0?'#4FCB98':'#E0684F'};display:inline-block;border-radius:2px;"></span><span class="muted" style="font-size:12px;">Kâr / Zarar</span></div>
+        </div>
+        ${renderStatChart(series)}
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Tarih</th><th>Yatırılan</th><th>Kâr/Zarar</th><th>Getiri %</th></tr></thead>
+          <tbody>
+            ${series.slice().reverse().map(pt => `<tr><td style="text-align:left;">${pt.date}</td><td>${fmt(pt.invested)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}">${pt.pnl>=0?'+':''}${fmt(pt.pnl)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}">${pt.pnl>=0?'+':''}${(pt.pnl/TOTAL_BUDGET*100).toFixed(2)}%</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    wireChartTooltips();
+  }
+
+  function renderStatChart(series){
+    const w = 640, h = 220, padL=64, padR=15, padT=20, padB=28;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const pnlVals = series.map(s=>s.pnl);
+    let maxV = Math.max(0, ...pnlVals);
+    let minV = Math.min(0, ...pnlVals);
+    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.1, 500);
+    maxV += pad;
+    minV -= pad;
+    const xFor = (i) => padL + (series.length===1 ? plotW/2 : i/(series.length-1)*plotW);
+    const yForVal = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+
+    const zeroY = yForVal(0);
+    const zeroPath = `M ${padL} ${zeroY.toFixed(1)} L ${(w-padR).toFixed(1)} ${zeroY.toFixed(1)}`;
+
+    const pnlColor = series[series.length-1].pnl >= 0 ? '#4FCB98' : '#E0684F';
+    let pnlPath = series.map((pt,i) => `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yForVal(pt.pnl).toFixed(1)}`).join(' ');
+    let pnlDots = series.map((pt,i) => `<circle class="pnl-dot" cx="${xFor(i).toFixed(1)}" cy="${yForVal(pt.pnl).toFixed(1)}" r="5" fill="${pt.pnl>=0?'#4FCB98':'#E0684F'}" stroke="#0A1628" stroke-width="1.2" data-date="${pt.date}" data-invested="${pt.invested}" data-pnl="${pt.pnl}"/>`).join('');
+
+    return `
+      <div class="chart-wrap" id="stat-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <path d="${zeroPath}" fill="none" stroke="#7FA3C9" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="${padL-6}" y="${zeroY.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#7FA3C9">0</text>
+          <path d="${pnlPath}" fill="none" stroke="${pnlColor}" stroke-width="2.2"/>
+          ${pnlDots}
+        </svg>
+        <div class="chart-tooltip" id="stat-chart-tooltip"></div>
+      </div>
+    `;
+  }
+
+  function wireChartTooltips(wrapId, tipId){
+    wrapId = wrapId || 'stat-chart-wrap';
+    tipId = tipId || 'stat-chart-tooltip';
+    const wrap = document.getElementById(wrapId);
+    const tip = document.getElementById(tipId);
+    if(!wrap || !tip) return;
+    const showTip = (dot, clientX, clientY) => {
+      const rect = wrap.getBoundingClientRect();
+      const date = dot.getAttribute('data-date');
+      const invested = parseFloat(dot.getAttribute('data-invested'));
+      const pnl = parseFloat(dot.getAttribute('data-pnl'));
+      const pct = invested ? (pnl/invested*100) : 0;
+      tip.innerHTML = `
+        <span class="tt-date">${date}</span>
+        <div class="tt-row"><span>Yatırılan</span><span>&nbsp;&nbsp;${fmt(invested)}</span></div>
+        <div class="tt-row"><span>Kâr/Zarar</span><span style="color:${pnl>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${pnl>=0?'+':''}${fmt(pnl)}</span></div>
+        <div class="tt-row"><span>K/Z %</span><span style="color:${pnl>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${pnl>=0?'+':''}${pct.toFixed(2)}%</span></div>
+      `;
+      tip.style.left = (clientX - rect.left) + 'px';
+      tip.style.top = (clientY - rect.top) + 'px';
+      tip.classList.add('visible');
+    };
+    wrap.querySelectorAll('.pnl-dot').forEach(dot => {
+      dot.style.cursor = 'pointer';
+      dot.addEventListener('mouseenter', (e) => showTip(dot, e.clientX, e.clientY));
+      dot.addEventListener('mousemove', (e) => showTip(dot, e.clientX, e.clientY));
+      dot.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+      dot.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        showTip(dot, t.clientX, t.clientY);
+        setTimeout(() => tip.classList.remove('visible'), 2200);
+      }, {passive:false});
+    });
+  }
+
+  function render(){
+    if(activeTab === 'panel') renderPanel();
+    if(activeTab === 'gunluk') renderGunluk();
+    if(activeTab === 'hafta') renderHafta();
+    if(activeTab === 'istatistik') renderIstatistik();
+    if(activeTab === 'gecmis') renderGecmis();
+    if(activeTab === 'kurulum') renderKurulum();
+    if(activeTab === 'yukleme-hatasi') renderYuklemeHatasi();
+    if(activeTab !== 'yukleme-hatasi') drawGauge();
+  }
+
+  function renderYuklemeHatasi(){
+    const el = document.getElementById('yukleme-hatasi-content');
+    el.innerHTML = `
+      <div class="card" style="border-color:var(--loss);">
+        <h2 class="section-title">Veri Yüklenemedi</h2>
+        <p class="muted" style="margin-bottom:16px;">Kayıtlı portföy verinize ulaşılamadı. Bu genelde geçici bir bağlantı sorunudur (özellikle mobil ağlarda) — <b>portföyünüz büyük ihtimalle kaybolmadı.</b> Önce tekrar deneyin.</p>
+        <p class="mono" style="font-size:10.5px;color:var(--ink-soft);background:var(--bg-2);padding:8px 10px;border-radius:6px;word-break:break-all;">Teknik detay: ${window.__rotasyonLoadErrorDetail || '—'}</p>
+        <button class="btn" id="retry-load-btn">Tekrar Dene</button>
+        <div id="retry-status" style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></div>
+        <div class="note-box" style="margin-top:20px;">
+          Birkaç kez denediniz ve hâlâ ulaşamıyorsanız, ve bu gerçekten <b>ilk kez</b> kullandığınız bir cihaz/oturumsa, aşağıdan yeni bir portföy kurabilirsiniz. <b>Dikkat:</b> eğer mevcut bir portföyünüz varsa ve bu sadece bağlantı sorunuysa, yeni kurulum yapmak eski verinizin üzerine yazmaz (ayrı bir kayıt değildir, aynı slot kullanılır) — bu yüzden emin değilseniz önce başka bir cihazdan/tarayıcıdan kontrol edin.
+        </div>
+        <button class="btn ghost" id="force-kurulum-btn" style="margin-top:10px;">Yine de Yeni Kurulum Ekranına Git</button>
+      </div>
+    `;
+    document.getElementById('retry-load-btn').onclick = async () => {
+      const statusEl = document.getElementById('retry-status');
+      statusEl.textContent = 'Deneniyor...';
+      await loadState();
+      if(!window.__rotasyonLoadError && state && state.initialized){
+        statusEl.style.color = 'var(--gain)';
+        statusEl.textContent = '✓ Bağlantı kuruldu, portföyünüz bulundu.';
+        setTimeout(() => setTab('panel'), 700);
+      } else if(!window.__rotasyonLoadError && !(state && state.initialized)){
+        statusEl.style.color = 'var(--ink-soft)';
+        statusEl.textContent = 'Bağlantı kuruldu ama kayıtlı bir portföy bulunamadı (muhtemelen gerçekten ilk kullanım).';
+      } else {
+        statusEl.style.color = 'var(--loss)';
+        statusEl.textContent = '✕ Hâlâ ulaşılamıyor: ' + (window.__rotasyonLoadErrorDetail || 'bilinmeyen hata');
+      }
+    };
+    document.getElementById('force-kurulum-btn').onclick = () => setTab('kurulum');
+  }
+
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if(btn) setTab(btn.dataset.tab);
+  });
+
+  (async function init(){
+    await loadState();
+    if(window.__rotasyonLoadError && !(state && state.initialized)){
+      setTab('yukleme-hatasi');
+    } else {
+      setTab(state && state.initialized ? 'panel' : 'kurulum');
+    }
+  })();
+})();
+</script>
+</body></html>
