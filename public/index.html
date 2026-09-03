@@ -408,6 +408,8 @@ window.storage = {
   const SEED_PRICES = { ASELS:350.00, THYAO:315.00, EREGL:42.00, GARAN:131.00, BIMAS:385.00, CRDFA:40.00 };
   const TICKER_COLORS = { ASELS:'#4FCB98', THYAO:'#E0684F', EREGL:'#7FA3C9', GARAN:'#F0923D', BIMAS:'#C97FD1', CRDFA:'#5FD1C9' };
   let dailyChartMode = 'genel'; // 'genel' | 'pozisyonlar'
+  let monthlyView = 'toplam'; // 'toplam' | 'hisse'
+  let monthlyUnit = 'tl'; // 'tl' | 'yuzde'
   const TOTAL_BUDGET = 2400000;
   const CASH_BUDGET = 1200000;
   const STOCK_BUDGET = 1200000;
@@ -516,6 +518,7 @@ window.storage = {
       if(!state.lastInterestDate) state.lastInterestDate = state.history[0].date;
       if(state.cashInterestEarned === undefined) state.cashInterestEarned = 0;
       if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
+      if(!state.dailyInterestOnly) state.dailyInterestOnly = {};
       if(state.positionCostBasis === undefined || state.realizedPnL === undefined){
         const rebuilt = reconstructCostBasisAndRealizedPnL();
         if(state.positionCostBasis === undefined) state.positionCostBasis = rebuilt.costBasis;
@@ -542,6 +545,7 @@ window.storage = {
     const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1; // girilen deger TEFAS 1 aylik % (yillik degil)
     const before = state.cash;
     if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
+    if(!state.dailyInterestOnly) state.dailyInterestOnly = {};
     if(!state.cashSettlements) state.cashSettlements = [];
     // Her günü ayrı ayrı işle — böylece araya kaç gün girerse girsin, her günün
     // kendi payını (o günün sonundaki nakit bakiyesini) ayrı ayrı bilebiliyoruz.
@@ -552,8 +556,10 @@ window.storage = {
       const dStr = cursor.toISOString().slice(0,10);
       const pending = pendingSettlementAmount(dStr, state.cashSettlements);
       const eligible = Math.max(0, state.cash - pending);
-      state.cash = state.cash + eligible * dailyRate;
+      const interestPortion = eligible * dailyRate;
+      state.cash = state.cash + interestPortion;
       state.dailyCashSnapshots[dStr] = state.cash;
+      state.dailyInterestOnly[dStr] = interestPortion; // SADECE faiz, ticaret etkisi karışmaz
     }
     state.cashInterestEarned = (state.cashInterestEarned||0) + (state.cash - before);
     state.lastInterestDate = today;
@@ -592,6 +598,7 @@ window.storage = {
     const dailyRate = newAnnualPct > 0 ? Math.pow(1 + newAnnualPct/100, 1/30) - 1 : 0; // girilen deger TEFAS 1 aylik %
     let runningCash = kurulumCash;
     const newSnapshots = {};
+    const newInterestOnly = {};
     let cursor = new Date(kurulumDate + 'T00:00:00Z');
     let totalInterest = 0;
     while(cursor.toISOString().slice(0,10) < today){
@@ -602,11 +609,14 @@ window.storage = {
       const interestPortion = eligible * dailyRate;
       runningCash += interestPortion;
       totalInterest += interestPortion;
+      newInterestOnly[dStr] = interestPortion; // SADECE faiz, ticaret etkisi karışmaz
       if(tradeDeltas[dStr] !== undefined){
         runningCash += tradeDeltas[dStr];
       }
       newSnapshots[dStr] = runningCash;
     }
+
+    state.dailyInterestOnly = newInterestOnly;
 
     state.cash = runningCash;
     state.cashAnnualYieldPct = newAnnualPct;
@@ -1855,6 +1865,7 @@ window.storage = {
         </div>
         ${renderStatChart(series)}
       </div>
+      ${renderMonthlyPnlSection()}
       <div class="card">
         <table>
           <thead><tr><th>Tarih</th><th>Yatırılan</th><th>Kâr/Zarar</th><th>Getiri %</th></tr></thead>
@@ -1865,6 +1876,294 @@ window.storage = {
       </div>
     `;
     wireChartTooltips();
+    wireMonthlyChartTooltips();
+    document.querySelectorAll('.monthly-view-btn').forEach(btn => {
+      btn.onclick = () => { monthlyView = btn.getAttribute('data-view'); renderIstatistik(); };
+    });
+    document.querySelectorAll('.monthly-unit-btn').forEach(btn => {
+      btn.onclick = () => { monthlyUnit = btn.getAttribute('data-unit'); renderIstatistik(); };
+    });
+  }
+
+  function computeMonthlyAggregates(){
+    // Her aya ait EN SON kaydı bul (kuruluş + rotasyonlar + anlık "şimdi")
+    const monthlyLast = {};
+    state.history.forEach(h => {
+      const month = h.date.slice(0,7);
+      if(!monthlyLast[month] || h.date >= monthlyLast[month].date){
+        monthlyLast[month] = {date: h.date, totalValue: h.totalValue, positions: h.positions};
+      }
+    });
+    const today = new Date().toISOString().slice(0,10);
+    const nowMonth = today.slice(0,7);
+    const stockValNow = TICKERS.reduce((s,t)=>s+state.positions[t]*(state.dailyPrices[t]||state.lastPrices[t]),0);
+    const nowTotal = state.cash + stockValNow;
+    const nowPositions = Object.fromEntries(TICKERS.map(t=>{
+      const price = state.dailyPrices[t]||state.lastPrices[t];
+      return [t, {price, qty: state.positions[t], value: state.positions[t]*price}];
+    }));
+    if(!monthlyLast[nowMonth] || today >= monthlyLast[nowMonth].date){
+      monthlyLast[nowMonth] = {date: today, totalValue: nowTotal, positions: nowPositions};
+    }
+    const months = Object.keys(monthlyLast).sort();
+    let prevTotal = TOTAL_BUDGET;
+    return months.map(m => {
+      const entry = monthlyLast[m];
+      const pnlTl = entry.totalValue - prevTotal;
+      const pnlPct = prevTotal ? (pnlTl/prevTotal*100) : 0;
+      prevTotal = entry.totalValue;
+      return { month: m, endValue: entry.totalValue, pnlTl, pnlPct, positions: entry.positions };
+    });
+  }
+
+  function computeMonthlyPPF(){
+    // dailyInterestOnly, SADECE faizden kaynaklanan günlük payı tutar — rotasyonlardaki
+    // alım/satım nakit akışları buna hiç karışmaz (önceki sürümde dailyCashSnapshots
+    // farkı kullanılıyordu, bu da rotasyon günlerinde ticaret etkisini yanlışlıkla
+    // "PPF faizi" olarak sayıyordu — düzeltildi).
+    const interestOnly = state.dailyInterestOnly || {};
+    const dates = Object.keys(interestOnly).sort();
+    const monthlyTl = {}, monthlyBase = {};
+    dates.forEach(d => {
+      const month = d.slice(0,7);
+      const portion = interestOnly[d] || 0;
+      monthlyTl[month] = (monthlyTl[month]||0) + portion;
+      // Yüzde hesap için baz: o günkü faiz öncesi nakit (yaklaşık — snapshot'tan çıkarılıyor)
+      const snap = state.dailyCashSnapshots ? state.dailyCashSnapshots[d] : undefined;
+      if(monthlyBase[month] === undefined && snap !== undefined){
+        monthlyBase[month] = snap - portion;
+      }
+    });
+    return { monthlyTl, monthlyBase };
+  }
+
+  function computeMonthlyPerTicker(){
+    // Sadece ay-sonu POZİSYON DEĞERİNİ karşılaştırmak yanıltıcı olur, çünkü bu
+    // strateji her hafta pozisyonu ~200.000 ₺ hedefine geri çekiyor — ay içinde
+    // kaç kez rotasyon olursa olsun ay sonu değeri hep hedefe yakın kalır.
+    // Bunun yerine, her hissenin TOPLAM kâr/zararını (o ana kadarki tüm SATIŞLARDAN
+    // gerçekleşen kâr/zarar + halihazırda elde tutulan pozisyonun maliyete göre
+    // gerçekleşmemiş kâr/zararı) kuruluştan itibaren tarihsel olarak yeniden kurup,
+    // ay sonları arasındaki farkını alıyoruz — gerçek aylık katkıyı verir.
+    const qty = {}, costBasis = {}, cumRealized = {};
+    TICKERS.forEach(t => {
+      const p = state.history[0].positions && state.history[0].positions[t];
+      qty[t] = p ? p.qty : 0;
+      costBasis[t] = p ? p.price : (state.lastPrices[t]||0);
+      cumRealized[t] = 0;
+    });
+
+    const monthlySnap = {}; // 'YYYY-MM' -> {date, totalPnl:{ticker:deger}}
+    for(let i=1; i<state.history.length; i++){
+      const entry = state.history[i];
+      (entry.transactions||[]).forEach(tx => {
+        if(!tx.ticker || !tx.action || tx.action==='YOK') return;
+        const t = tx.ticker;
+        if(tx.action === 'AL'){
+          const oldQty = qty[t], newQty = oldQty + tx.qty;
+          costBasis[t] = newQty>0 ? (oldQty*costBasis[t] + tx.qty*tx.price) / newQty : tx.price;
+          qty[t] = newQty;
+        } else if(tx.action === 'SAT'){
+          cumRealized[t] += (tx.realized !== undefined ? tx.realized : (tx.price-costBasis[t])*tx.qty);
+          qty[t] -= tx.qty;
+        }
+      });
+      const month = entry.date.slice(0,7);
+      const totalPnl = {};
+      TICKERS.forEach(t => {
+        const price = entry.positions && entry.positions[t] ? entry.positions[t].price : costBasis[t];
+        totalPnl[t] = qty[t]*(price-costBasis[t]) + cumRealized[t];
+      });
+      if(!monthlySnap[month] || entry.date >= monthlySnap[month].date){
+        monthlySnap[month] = { date: entry.date, totalPnl };
+      }
+    }
+    // Anlık "şimdi" noktasını da ekle (güncel fiyatlarla)
+    const today = new Date().toISOString().slice(0,10);
+    const nowMonth = today.slice(0,7);
+    const nowTotalPnl = {};
+    TICKERS.forEach(t => {
+      const price = state.dailyPrices[t]||state.lastPrices[t];
+      const liveCost = state.positionCostBasis && state.positionCostBasis[t] !== undefined ? state.positionCostBasis[t] : costBasis[t];
+      const liveQty = state.positions[t] !== undefined ? state.positions[t] : qty[t];
+      const liveRealized = state.realizedPnL !== undefined ? cumRealized[t] : cumRealized[t]; // per-ticker realized zaten cumRealized'ta
+      nowTotalPnl[t] = liveQty*(price-liveCost) + cumRealized[t];
+    });
+    if(!monthlySnap[nowMonth] || today >= monthlySnap[nowMonth].date){
+      monthlySnap[nowMonth] = { date: today, totalPnl: nowTotalPnl };
+    }
+
+    const months = Object.keys(monthlySnap).sort();
+    const ppfData = computeMonthlyPPF();
+    const prevVal = {}; TICKERS.forEach(t => prevVal[t] = 0); // kuruluşta henüz kâr/zarar yok
+    return months.map(m => {
+      const perTicker = {};
+      TICKERS.forEach(t => {
+        const val = monthlySnap[m].totalPnl[t];
+        const pnlTl = val - prevVal[t];
+        const pnlPct = TARGET_PER_STOCK ? (pnlTl/TARGET_PER_STOCK*100) : 0; // hedef bant (200k) baz alınır
+        perTicker[t] = { pnlTl, pnlPct };
+        prevVal[t] = val;
+      });
+      const ppfTl = ppfData.monthlyTl[m] || 0;
+      const ppfBase = ppfData.monthlyBase[m];
+      const ppfPct = ppfBase ? (ppfTl/ppfBase*100) : 0;
+      perTicker['PPF'] = { pnlTl: ppfTl, pnlPct: ppfPct };
+      return { month: m, perTicker };
+    });
+  }
+
+  function renderMonthlyPnlSection(){
+    const aggData = computeMonthlyAggregates();
+    if(aggData.length === 0) return '';
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+          <h2 class="section-title" style="font-size:15px;margin:0;">Aylık K/Z</h2>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:3px;">
+              <button type="button" class="monthly-view-btn" data-view="toplam" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${monthlyView==='toplam'?'var(--brass)':'transparent'};color:${monthlyView==='toplam'?'#062318':'var(--ink-soft)'};">Toplam</button>
+              <button type="button" class="monthly-view-btn" data-view="hisse" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${monthlyView==='hisse'?'var(--brass)':'transparent'};color:${monthlyView==='hisse'?'#062318':'var(--ink-soft)'};">Hisse Kırılımlı</button>
+            </div>
+            <div style="display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:3px;">
+              <button type="button" class="monthly-unit-btn" data-unit="tl" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${monthlyUnit==='tl'?'var(--brass)':'transparent'};color:${monthlyUnit==='tl'?'#062318':'var(--ink-soft)'};">₺</button>
+              <button type="button" class="monthly-unit-btn" data-unit="yuzde" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${monthlyUnit==='yuzde'?'var(--brass)':'transparent'};color:${monthlyUnit==='yuzde'?'#062318':'var(--ink-soft)'};">%</button>
+            </div>
+          </div>
+        </div>
+        ${monthlyView==='toplam' ? renderMonthlyAggregateChart(aggData, monthlyUnit) : renderMonthlyPerTickerChart(computeMonthlyPerTicker(), monthlyUnit)}
+      </div>
+    `;
+  }
+
+  function monthLabel(m){
+    const [y,mo] = m.split('-');
+    const isimler = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    return isimler[parseInt(mo,10)-1] + ' ' + y.slice(2);
+  }
+
+  function renderMonthlyAggregateChart(data, unit){
+    const w = 640, h = 220, padL=64, padR=15, padT=20, padB=32;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const vals = data.map(d => unit==='tl' ? d.pnlTl : d.pnlPct);
+    let maxV = Math.max(0, ...vals), minV = Math.min(0, ...vals);
+    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.12, unit==='tl'?500:1);
+    maxV += pad; minV -= pad;
+    const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+    const zeroY = yFor(0);
+    const barW = Math.min(56, plotW/data.length*0.55);
+    const slot = plotW/data.length;
+
+    const bars = data.map((d,i) => {
+      const v = unit==='tl' ? d.pnlTl : d.pnlPct;
+      const x = padL + slot*i + (slot-barW)/2;
+      const y = Math.min(zeroY, yFor(v));
+      const barH = Math.max(1, Math.abs(yFor(v)-zeroY));
+      const color = v>=0 ? '#4FCB98' : '#E0684F';
+      const valText = unit==='tl' ? fmt(v) : (v>=0?'+':'')+v.toFixed(2)+'%';
+      return `
+        <g class="monthly-bar" data-month="${d.month}" data-tl="${d.pnlTl}" data-pct="${d.pnlPct}" style="cursor:pointer;">
+          <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" rx="3"/>
+          <text x="${(x+barW/2).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#8CA0BC">${monthLabel(d.month)}</text>
+        </g>
+      `;
+    }).join('');
+
+    return `
+      <div class="chart-wrap" id="monthly-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <text x="${padL-6}" y="${zeroY}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">0</text>
+          ${bars}
+        </svg>
+        <div class="chart-tooltip" id="monthly-chart-tooltip"></div>
+      </div>
+    `;
+  }
+
+  function renderMonthlyPerTickerChart(data, unit){
+    const PPF_COLOR = '#F1F5FA';
+    const CHART_ITEMS = TICKERS.concat(['PPF']);
+    const colorFor = (t) => t==='PPF' ? PPF_COLOR : TICKER_COLORS[t];
+    const w = 680, h = 240, padL=64, padR=15, padT=20, padB=32;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    let allVals = [];
+    data.forEach(d => CHART_ITEMS.forEach(t => allVals.push(unit==='tl' ? d.perTicker[t].pnlTl : d.perTicker[t].pnlPct)));
+    let maxV = Math.max(0, ...allVals), minV = Math.min(0, ...allVals);
+    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.12, unit==='tl'?200:1);
+    maxV += pad; minV -= pad;
+    const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+    const zeroY = yFor(0);
+    const groupSlot = plotW/data.length;
+    const barW = Math.min(8, groupSlot/CHART_ITEMS.length*0.75);
+
+    let bars = '';
+    let labels = '';
+    data.forEach((d, gi) => {
+      const groupX = padL + groupSlot*gi;
+      CHART_ITEMS.forEach((t, ti) => {
+        const v = unit==='tl' ? d.perTicker[t].pnlTl : d.perTicker[t].pnlPct;
+        const x = groupX + (groupSlot - barW*CHART_ITEMS.length)/2 + ti*barW;
+        const y = Math.min(zeroY, yFor(v));
+        const barH = Math.max(1, Math.abs(yFor(v)-zeroY));
+        bars += `<rect class="monthly-bar" data-month="${d.month}" data-ticker="${t}" data-tl="${d.perTicker[t].pnlTl}" data-pct="${d.perTicker[t].pnlPct}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW-1).toFixed(1)}" height="${barH.toFixed(1)}" fill="${colorFor(t)}" rx="1.5" style="cursor:pointer;"/>`;
+      });
+      labels += `<text x="${(groupX+groupSlot/2).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#8CA0BC">${monthLabel(d.month)}</text>`;
+    });
+
+    const legend = CHART_ITEMS.map(t => `
+      <div style="display:flex;align-items:center;gap:5px;">
+        <span style="width:9px;height:9px;background:${colorFor(t)};display:inline-block;border-radius:2px;"></span>
+        <span class="muted" style="font-size:10.5px;">${t==='PPF'?'PPF (Nakit)':t}</span>
+      </div>
+    `).join('');
+
+    return `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">${legend}</div>
+      <div class="chart-wrap" id="monthly-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <text x="${padL-6}" y="${zeroY}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">0</text>
+          ${bars}
+          ${labels}
+        </svg>
+        <div class="chart-tooltip" id="monthly-chart-tooltip"></div>
+      </div>
+    `;
+  }
+
+  function wireMonthlyChartTooltips(){
+    const wrap = document.getElementById('monthly-chart-wrap');
+    const tip = document.getElementById('monthly-chart-tooltip');
+    if(!wrap || !tip) return;
+    const showTip = (el, clientX, clientY) => {
+      const rect = wrap.getBoundingClientRect();
+      const month = el.getAttribute('data-month');
+      const ticker = el.getAttribute('data-ticker');
+      const tl = parseFloat(el.getAttribute('data-tl'));
+      const pct = parseFloat(el.getAttribute('data-pct'));
+      tip.innerHTML = `
+        <span class="tt-date">${monthLabel(month)}${ticker?(' · '+(ticker==='PPF'?'PPF (Nakit)':ticker)):''}</span>
+        <div class="tt-row"><span>K/Z ₺</span><span style="color:${tl>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${tl>=0?'+':''}${fmt(tl)}</span></div>
+        <div class="tt-row"><span>K/Z %</span><span style="color:${pct>=0?'#4FCB98':'#E0684F'};">&nbsp;&nbsp;${pct>=0?'+':''}${pct.toFixed(2)}%</span></div>
+      `;
+      tip.style.left = (clientX - rect.left) + 'px';
+      tip.style.top = (clientY - rect.top) + 'px';
+      tip.classList.add('visible');
+    };
+    wrap.querySelectorAll('.monthly-bar').forEach(el => {
+      el.addEventListener('mouseenter', (e) => showTip(el, e.clientX, e.clientY));
+      el.addEventListener('mousemove', (e) => showTip(el, e.clientX, e.clientY));
+      el.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+      el.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        showTip(el, t.clientX, t.clientY);
+        setTimeout(() => tip.classList.remove('visible'), 2200);
+      }, {passive:false});
+    });
   }
 
   function renderStatChart(series){
