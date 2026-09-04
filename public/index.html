@@ -13,10 +13,6 @@
 <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
-<style>
-  html,body{margin:0;padding:0;background:#0A1628;}
-  #rotasyon-root{max-width:none;border-radius:0;min-height:100vh;padding-bottom:90px;}
-</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -97,6 +93,7 @@
   /* Goal gauge */
   .gauge-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
   .header-stats-row{display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;}
+  .mini-stat-row{display:flex;gap:22px;}
   .mini-stat{display:flex;flex-direction:column;align-items:flex-start;min-width:96px;padding-top:6px;}
   .mini-stat-label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;}
   .mini-stat-value{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;color:var(--ink);}
@@ -289,7 +286,73 @@
   .chart-tooltip .tt-date{color:var(--brass);font-weight:600;display:block;margin-bottom:4px;font-family:'Space Grotesk',sans-serif;}
   .chart-tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;}
   .chart-tooltip .tt-row + .tt-row{margin-top:2px;}
+
+  /* Mobil düzen: gösterge ortalı ve büyük, altında Günlük/Toplam K/Z yan yana ortalı */
+  @media (max-width: 560px){
+    .masthead{ flex-direction: column; }
+    .header-stats-row{
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      gap: 18px;
+      margin-top: 8px;
+    }
+    .gauge-wrap svg{ width: 150px; height: 96px; }
+    .gauge-value{ font-size: 21px; }
+    .mini-stat-row{
+      width: 100%;
+      justify-content: space-evenly;
+      gap: 12px;
+    }
+    .mini-stat{
+      align-items: center;
+      text-align: center;
+      min-width: 0;
+      flex: 1;
+    }
+
+    /* Pozisyonlar tablosu: genişlik yetmediğinde her satır bir kart, her hücre
+       etiket + değer şeklinde alt alta dizilir — yatay taşma olmaz. */
+    .responsive-table thead{ display: none; }
+    .responsive-table, .responsive-table tbody, .responsive-table tr, .responsive-table td{
+      display: block;
+      width: 100%;
+    }
+    .responsive-table tr{
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      padding: 4px 12px;
+      background: var(--bg-2);
+    }
+    .responsive-table tr.pair-divider{
+      border: none;
+      background: transparent;
+      padding: 4px 0;
+      margin-bottom: 4px;
+    }
+    .responsive-table td{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed var(--line);
+      padding: 9px 0;
+      text-align: right;
+    }
+    .responsive-table tr.pair-divider td{ border-bottom: none; padding: 0; }
+    .responsive-table tr td:last-child{ border-bottom: none; }
+    .responsive-table td[data-label]::before{
+      content: attr(data-label);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10.5px;
+      color: var(--ink-soft);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      text-align: left;
+    }
+  }
 </style>
+
 
 <div id="rotasyon-root">
   <div class="masthead">
@@ -307,15 +370,17 @@
         <div class="gauge-value" id="gauge-value">0 ₺</div>
         <div class="gauge-label">Hedef: 10.000.000 ₺</div>
       </div>
-      <div class="mini-stat">
-        <div class="mini-stat-label">Günlük K/Z</div>
-        <div class="mini-stat-value" id="daily-pnl-value">—</div>
-        <div class="mini-stat-pct" id="daily-pnl-pct"></div>
-      </div>
-      <div class="mini-stat">
-        <div class="mini-stat-label">Toplam K/Z</div>
-        <div class="mini-stat-value" id="total-pnl-value">—</div>
-        <div class="mini-stat-pct" id="total-pnl-pct"></div>
+      <div class="mini-stat-row">
+        <div class="mini-stat">
+          <div class="mini-stat-label">Günlük K/Z</div>
+          <div class="mini-stat-value" id="daily-pnl-value">—</div>
+          <div class="mini-stat-pct" id="daily-pnl-pct"></div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-stat-label">Toplam K/Z</div>
+          <div class="mini-stat-value" id="total-pnl-value">—</div>
+          <div class="mini-stat-pct" id="total-pnl-pct"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -938,7 +1003,7 @@ window.storage = {
       </div>
       <div class="card">
         <h2 class="section-title">Pozisyonlar</h2>
-        <table>
+        <table class="responsive-table">
           <thead><tr><th>Hisse</th><th>Adet</th><th>Fiyat</th><th>Değer</th><th>Hedef Farkı</th></tr></thead>
           <tbody>${renderPositionRows()}</tbody>
         </table>
@@ -1011,7 +1076,7 @@ window.storage = {
     const cashColor = '#2FB380';
     const stockColor = '#7FA3C9';
     return `
-      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
         <svg width="148" height="148" viewBox="0 0 148 148" style="flex-shrink:0;">
           <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#294869" stroke-width="18"/>
           <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${stockColor}" stroke-width="18"
@@ -1023,7 +1088,7 @@ window.storage = {
           <text x="${cx}" y="${cy-4}" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="17" font-weight="700" fill="#F1F5FA">%${stockPct.toFixed(0)}</text>
           <text x="${cx}" y="${cy+14}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">HİSSE</text>
         </svg>
-        <div style="display:flex;flex-direction:column;gap:14px;min-width:160px;">
+        <div style="display:flex;gap:28px;width:100%;justify-content:center;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:9px;">
             <span style="width:11px;height:11px;border-radius:3px;background:${stockColor};display:inline-block;flex-shrink:0;"></span>
             <div>
@@ -1118,11 +1183,11 @@ window.storage = {
         const diff = val - state.targetPerStock;
         const diffClass = diff >= 0 ? 'diff-up' : 'diff-down';
         rows += `<tr>
-          <td class="tick-name">${t}</td>
-          <td>${fmtInt(qty)}</td>
-          <td>${fmt(price)}</td>
-          <td>${fmt(val)}</td>
-          <td class="${diffClass}">${diff>=0?'+':''}${fmt(diff)}</td>
+          <td class="tick-name" data-label="Hisse">${t}</td>
+          <td data-label="Adet">${fmtInt(qty)}</td>
+          <td data-label="Fiyat">${fmt(price)}</td>
+          <td data-label="Değer">${fmt(val)}</td>
+          <td class="${diffClass}" data-label="Hedef Farkı">${diff>=0?'+':''}${fmt(diff)}</td>
         </tr>`;
       });
     });
@@ -1198,11 +1263,11 @@ window.storage = {
           const diff = valNow - valBase;
           const diffClass = diff >= 0 ? 'diff-up' : 'diff-down';
           rows += `<tr>
-            <td class="tick-name">${t}</td>
-            <td>${fmtInt(qty)}</td>
-            <td>${fmt(priceNow)}</td>
-            <td>${fmt(valNow)}</td>
-            <td class="${diffClass}">${diff>=0?'+':''}${fmt(diff)}</td>
+            <td class="tick-name" data-label="Hisse">${t}</td>
+            <td data-label="Adet">${fmtInt(qty)}</td>
+            <td data-label="Anlık Fiyat">${fmt(priceNow)}</td>
+            <td data-label="Anlık Değer">${fmt(valNow)}</td>
+            <td class="${diffClass}" data-label="Son Rotasyona Göre">${diff>=0?'+':''}${fmt(diff)}</td>
           </tr>`;
         });
       });
@@ -1227,7 +1292,7 @@ window.storage = {
           </div>
         </div>
         <div class="card">
-          <table>
+          <table class="responsive-table">
             <thead><tr><th>Hisse</th><th>Adet</th><th>Anlık Fiyat</th><th>Anlık Değer</th><th>Son Rotasyona Göre</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -1303,17 +1368,39 @@ window.storage = {
     const pnlVals = log.map(p=>p.totalValue - TOTAL_BUDGET);
     let maxV = Math.max(0, ...pnlVals);
     let minV = Math.min(0, ...pnlVals);
-    const pad = Math.max((maxV-minV)*0.18, Math.max(Math.abs(maxV),Math.abs(minV))*0.1, 500);
+    // Daha hassas gösterim için Y ekseni etrafındaki boşluğu daraltıyoruz —
+    // küçük günlük dalgalanmalar artık daha belirgin görünür.
+    const pad = Math.max((maxV-minV)*0.08, Math.max(Math.abs(maxV),Math.abs(minV))*0.03, 150);
     maxV += pad;
     minV -= pad;
-    const w = 640, h = 150, padL=60, padR=15, padT=15, padB=26;
+    // Mobilde daha kare/pencere hissi veren oran (geniş-kısa yerine kareye yakın)
+    const w = 400, h = 380, padL=56, padR=14, padT=18, padB=32;
     const plotW = w-padL-padR, plotH = h-padT-padB;
     const xFor = (i) => padL + (log.length===1 ? plotW/2 : i/(log.length-1)*plotW);
     const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
     const zeroY = yFor(0);
     const zeroPath = `M ${padL} ${zeroY.toFixed(1)} L ${(w-padR).toFixed(1)} ${zeroY.toFixed(1)}`;
     let path = log.map((pt,i) => `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yFor(pt.totalValue - TOTAL_BUDGET).toFixed(1)}`).join(' ');
-    let dots = log.map((pt,i) => `<circle class="pnl-dot" cx="${xFor(i).toFixed(1)}" cy="${yFor(pt.totalValue - TOTAL_BUDGET).toFixed(1)}" r="4.5" fill="#2FB380" stroke="#0A1628" stroke-width="1.2" data-date="${pt.date}" data-invested="${TOTAL_BUDGET}" data-pnl="${pt.totalValue - TOTAL_BUDGET}"/>`).join('');
+    let dots = log.map((pt,i) => `<circle class="pnl-dot" cx="${xFor(i).toFixed(1)}" cy="${yFor(pt.totalValue - TOTAL_BUDGET).toFixed(1)}" r="6" fill="#2FB380" stroke="#0A1628" stroke-width="1.4" data-date="${pt.date}" data-invested="${TOTAL_BUDGET}" data-pnl="${pt.totalValue - TOTAL_BUDGET}"/>`).join('');
+
+    // Y ekseni: üst, sıfır ve alt değer etiketleri
+    const fmtAxis = (n) => Math.round(n).toLocaleString('tr-TR') + ' ₺';
+    const yAxisLabels = `
+      <text x="${padL-6}" y="${(padT+4).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtAxis(maxV)}</text>
+      <text x="${padL-6}" y="${(h-padB-2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtAxis(minV)}</text>
+    `;
+
+    // X ekseni: ay değiştiği her noktada bir ay etiketi
+    let xAxisLabels = '';
+    let lastMonth = null;
+    log.forEach((pt, i) => {
+      const month = pt.date.slice(0,7);
+      if(month !== lastMonth){
+        xAxisLabels += `<text x="${xFor(i).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${monthLabel(month)}</text>`;
+        lastMonth = month;
+      }
+    });
+
     return `
       <div class="chart-wrap" id="daily-chart-wrap">
         <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
@@ -1321,6 +1408,8 @@ window.storage = {
           <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
           <path d="${zeroPath}" fill="none" stroke="#7FA3C9" stroke-width="1.5" stroke-dasharray="5 4"/>
           <text x="${padL-6}" y="${zeroY.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#7FA3C9">0</text>
+          ${yAxisLabels}
+          ${xAxisLabels}
           <path d="${path}" fill="none" stroke="#4FCB98" stroke-width="2"/>
           ${dots}
         </svg>
@@ -1353,7 +1442,7 @@ window.storage = {
       }
     });
 
-    const w = 640, h = 170, padL=50, padR=15, padT=15, padB=26;
+    const w = 400, h = 380, padL=44, padR=14, padT=18, padB=32;
     const plotW = w-padL-padR, plotH = h-padT-padB;
     const xFor = (i) => padL + (dates.length===1 ? plotW/2 : i/(dates.length-1)*plotW);
 
@@ -1402,7 +1491,7 @@ window.storage = {
         const x = xFor(i).toFixed(1), y = yFor(pct).toFixed(1);
         d += (started ? 'L' : 'M') + ' ' + x + ' ' + y + ' ';
         started = true;
-        dots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="3.5" fill="${color}" stroke="#0A1628" stroke-width="1" data-ticker="${t}" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>${t} · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
+        dots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="5" fill="${color}" stroke="#0A1628" stroke-width="1.2" data-ticker="${t}" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>${t} · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
       });
       paths += `<path d="${d.trim()}" fill="none" stroke="${color}" stroke-width="2"/>`;
       allDots += dots;
@@ -1417,10 +1506,28 @@ window.storage = {
       const x = xFor(i).toFixed(1), y = yFor(pct).toFixed(1);
       const tlDiff = state.cash * (pct/100);
       ppfPath += (i===0 ? 'M' : 'L') + ' ' + x + ' ' + y + ' ';
-      ppfDots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="3" fill="${PPF_COLOR}" stroke="#0A1628" stroke-width="1" data-ticker="PPF (Nakit)" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>PPF (Nakit) · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
+      ppfDots += `<circle class="pos-dot" cx="${x}" cy="${y}" r="4.5" fill="${PPF_COLOR}" stroke="#0A1628" stroke-width="1.2" data-ticker="PPF (Nakit)" data-date="${date}" data-pct="${pct}" data-tl="${tlDiff}"><title>PPF (Nakit) · ${date} · ${pct>=0?'+':''}${pct.toFixed(2)}%</title></circle>`;
     });
     paths += `<path d="${ppfPath.trim()}" fill="none" stroke="${PPF_COLOR}" stroke-width="1.8" stroke-dasharray="5 4"/>`;
     allDots += ppfDots;
+
+    // Y ekseni: üst, sıfır, alt yüzde etiketleri
+    const fmtPctAxis = (v) => `${v>=0?'+':''}${v.toFixed(1)}%`;
+    const yAxisLabels = `
+      <text x="${padL-6}" y="${(padT+4).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtPctAxis(maxV)}</text>
+      <text x="${padL-6}" y="${(h-padB-2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtPctAxis(minV)}</text>
+    `;
+
+    // X ekseni: ay değiştiği her noktada bir ay etiketi
+    let xAxisLabels = '';
+    let lastMonth = null;
+    dates.forEach((date, i) => {
+      const month = date.slice(0,7);
+      if(month !== lastMonth){
+        xAxisLabels += `<text x="${xFor(i).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${monthLabel(month)}</text>`;
+        lastMonth = month;
+      }
+    });
 
     const legend = TICKERS.map(t => `
       <div style="display:flex;align-items:center;gap:6px;">
@@ -1442,12 +1549,13 @@ window.storage = {
           <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
           <line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" stroke="#4A5A50" stroke-width="1" stroke-dasharray="4 3"/>
           <text x="${padL-6}" y="${zeroY}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">%0</text>
+          ${yAxisLabels}
+          ${xAxisLabels}
           ${paths}
           ${allDots}
         </svg>
         <div class="chart-tooltip" id="positions-chart-tooltip"></div>
       </div>
-      <p class="muted" style="font-size:11px;margin-top:8px;">Her çizgi, ilgili hissenin bu grafikteki ilk kayıtlı (bugünden itibaren) fiyatına göre yüzde değişimini gösterir. Eski/kuruluş verisi dahil edilmez. Kesikli beyaz çizgi (PPF/Nakit), güncel oranla saf bileşik büyümeyi gösterir — alım/satım nakit akışlarından bağımsız bir referanstır, gerçek nakit bakiyenizle birebir aynı olmayabilir.</p>
     `;
   }
 
@@ -1479,8 +1587,9 @@ window.storage = {
         e.preventDefault();
         const t = e.touches[0];
         showTip(dot, t.clientX, t.clientY);
-        setTimeout(() => tip.classList.remove('visible'), 2200);
       }, {passive:false});
+      dot.addEventListener('touchend', () => tip.classList.remove('visible'));
+      dot.addEventListener('touchcancel', () => tip.classList.remove('visible'));
     });
   }
 
@@ -2168,8 +2277,9 @@ window.storage = {
         e.preventDefault();
         const t = e.touches[0];
         showTip(el, t.clientX, t.clientY);
-        setTimeout(() => tip.classList.remove('visible'), 2200);
       }, {passive:false});
+      el.addEventListener('touchend', () => tip.classList.remove('visible'));
+      el.addEventListener('touchcancel', () => tip.classList.remove('visible'));
     });
   }
 
@@ -2238,8 +2348,9 @@ window.storage = {
         e.preventDefault();
         const t = e.touches[0];
         showTip(dot, t.clientX, t.clientY);
-        setTimeout(() => tip.classList.remove('visible'), 2200);
       }, {passive:false});
+      dot.addEventListener('touchend', () => tip.classList.remove('visible'));
+      dot.addEventListener('touchcancel', () => tip.classList.remove('visible'));
     });
   }
 
@@ -2303,4 +2414,5 @@ window.storage = {
   })();
 })();
 </script>
+
 </body></html>
