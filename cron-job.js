@@ -10,6 +10,37 @@
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const GOOGLE_SHEET_CSV_URL = process.env.GOOGLE_SHEET_CSV_URL;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+// Telegram bildirimi gönderir. Token/chat_id tanımlı değilse sessizce atlar
+// (bildirim opsiyonel bir özellik, olmadan da görev normal çalışmaya devam eder).
+// Bildirim gönderimi başarısız olursa görevin kendisini DURDURMAZ, sadece loglar.
+async function sendTelegramNotification(text) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn('Telegram bildirimi ATLANDI: TELEGRAM_BOT_TOKEN veya TELEGRAM_CHAT_ID tanımlı değil.');
+    return;
+  }
+  try {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
+    });
+    if (!res.ok) {
+      console.warn('Telegram bildirimi gönderilemedi:', res.status, await res.text());
+    } else {
+      console.log('✓ Telegram bildirimi gönderildi.');
+    }
+  } catch (e) {
+    console.warn('Telegram bildirimi gönderilemedi:', e.message);
+  }
+}
+
+function fmtTL(n) {
+  return (n || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+}
 
 if (!UPSTASH_URL || !UPSTASH_TOKEN) {
   console.error('UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN tanımlı değil.');
@@ -244,6 +275,21 @@ async function main() {
   accrueCashInterest(state);
 
   if (isFriday) {
+    // Rotasyon öncesi durumu kaydet — böylece web arayüzündeki "Rotasyonu Geri Al"
+    // butonu, cron tarafından uygulanan bu rotasyonu da doğru şekilde geri alabilir.
+    state.undoSnapshot = JSON.parse(JSON.stringify({
+      cash: state.cash,
+      cashCostBasis: state.cashCostBasis !== undefined ? state.cashCostBasis : state.cash,
+      totalStopajPaid: state.totalStopajPaid || 0,
+      positions: state.positions,
+      positionCostBasis: state.positionCostBasis || {},
+      realizedPnL: state.realizedPnL || 0,
+      lastPrices: state.lastPrices,
+      dailyPrices: state.dailyPrices,
+      history: state.history,
+      cashSettlements: state.cashSettlements || [],
+    }));
+
     const result = applyRotation(state, prices, todayStr);
     console.log('Rotasyon uygulandı. Yeni toplam varlık:', result.totalValue.toFixed(2), '₺');
     console.log('İşlemler:', JSON.stringify(result.transactions, null, 2));
@@ -255,16 +301,31 @@ async function main() {
     // günü için boşluk gösterir.
     applyDailySave(state, prices, todayStr);
     console.log('Günlük Seyir/Pozisyonlar grafikleri için dailyLog kaydı da eklendi.');
+
+    const txLines = result.transactions
+      .filter(tx => tx.action !== 'YOK')
+      .map(tx => `• <b>${tx.ticker}</b>: ${tx.action} ${tx.qty} adet @${tx.price.toFixed(2)}`)
+      .join('\n');
+    await sendTelegramNotification(
+      `✅ <b>${todayStr} rotasyonu uygulandı</b>\n\n` +
+      (txLines || 'Hiçbir hisse hedef bandın dışına çıkmadı, işlem yapılmadı.') +
+      `\n\nYeni toplam varlık: <b>${fmtTL(result.totalValue)}</b>` +
+      (result.totalStopajPaid > 0 ? `\nKesilen stopaj: ${fmtTL(result.totalStopajPaid)}` : '')
+    );
   } else {
     const totalNow = applyDailySave(state, prices, todayStr);
     console.log('Günlük kayıt eklendi. Anlık toplam varlık:', totalNow.toFixed(2), '₺');
+    await sendTelegramNotification(
+      `📊 <b>${todayStr} günlük kayıt eklendi</b>\n\nToplam varlık: <b>${fmtTL(totalNow)}</b>`
+    );
   }
 
   await upstashSet(STORAGE_KEY, JSON.stringify(state));
   console.log('✓ Görev tamamlandı, veri Upstash\'e kaydedildi.');
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error('HATA:', err.message);
+  await sendTelegramNotification(`⚠️ <b>Görev başarısız oldu</b>\n\n${err.message}`);
   process.exit(1);
 });
