@@ -436,9 +436,6 @@
 </div>
 
 <script>
-// Claude artifact'ının window.storage'ı yerine, kendi backend'imize (Express + Redis)
-// bağlanan gerçek bir HTTP tabanlı depolama katmanı. Geri kalan uygulama kodu
-// (loadState/saveState vb.) hiç değişmeden aynı arayüzü kullanmaya devam ediyor.
 window.storage = {
   async get(key, shared){
     const res = await fetch('/api/storage/' + encodeURIComponent(key));
@@ -479,7 +476,7 @@ window.storage = {
   ];
   const SEED_PRICES = { ASELS:350.00, THYAO:315.00, EREGL:42.00, GARAN:131.00, BIMAS:385.00, CRDFA:40.00 };
   const TICKER_COLORS = { ASELS:'#4FCB98', THYAO:'#E0684F', EREGL:'#7FA3C9', GARAN:'#F0923D', BIMAS:'#C97FD1', CRDFA:'#5FD1C9' };
-  let dailyChartMode = 'genel'; // 'genel' | 'pozisyonlar'
+  let dailyChartMode = 'genel'; // 'genel' | 'hisseler' | 'pozisyonlar'
   let monthlyView = 'toplam'; // 'toplam' | 'hisse'
   let monthlyUnit = 'tl'; // 'tl' | 'yuzde'
   const TOTAL_BUDGET = 2400000;
@@ -487,7 +484,7 @@ window.storage = {
   const STOCK_BUDGET = 1200000;
   const TARGET_PER_STOCK = STOCK_BUDGET / TICKERS.length; // 200.000
   const GOAL = 10000000;
-  const DEFAULT_PPF_ANNUAL_PCT = 2.94; // Garanti Portföy Birinci Para Piyasası (TL) Fonu (GTL) - TEFAS'taki SON 1 AYLIK getiri yüzdesi (yıllık değil) — her kontrolünüzde güncel oranla değiştirin
+  const DEFAULT_PPF_ANNUAL_PCT = 0.75; // Garanti Portföy Birinci Para Piyasası (TL) Fonu (GTL) - TEFAS'taki SON 1 HAFTALIK getiri yüzdesi (aylık/yıllık değil) — her kontrolünüzde güncel oranla değiştirin
   const STORAGE_KEY = 'state';
 
   let state = null;
@@ -532,6 +529,37 @@ window.storage = {
   // Geçmiş işlem kayıtlarından, her hissenin ortalama maliyetini ve o ana kadar
   // realize edilmiş (kapatılmış) toplam kâr/zararı yeniden inşa eder. Sadece
   // geriye dönük uyumluluk için (eski kayıtlarda bu alanlar hiç tutulmuyordu).
+  // Bir temettü ödemesini kaydeder: mevcut lot adedi × net temettü tutarı kadar
+  // nakde ekler, kümülatif temettü gelirini (toplam + hisse bazlı) günceller.
+  // NOT: Hisse fiyatına dokunmuyoruz — temettü kesildiğinde borsada fiyat zaten
+  // kendiliğinden düşer (bu normal ve beklenen); önemli olan bu düşüşün karşılığı
+  // olan nakdin de sisteme girmesi, yoksa gerçekte olmayan bir "kayıp" görünür.
+  function recordDividend(ticker, date, perShare){
+    if(!state || !state.initialized) return null;
+    const qty = state.positions[ticker] || 0;
+    const total = qty * perShare;
+    state.cash += total;
+    state.cashCostBasis = (state.cashCostBasis !== undefined ? state.cashCostBasis : state.cash) + total; // temettü saf anapara, PPF kârı değil
+    if(!state.dividendLog) state.dividendLog = [];
+    state.dividendLog.push({ date, ticker, perShare, qty, total });
+    state.dividendIncome = (state.dividendIncome||0) + total;
+    return total;
+  }
+
+  // Belirli bir tarihe kadar, bir hissenin kümülatif temettü gelirini hesaplar
+  // (aylık hisse bazlı K/Z grafiğinde kullanılıyor — temettü kesintisiyle oluşan
+  // fiyat düşüşünün karşılığını aynı hissenin K/Z'sine geri ekler).
+  function cumulativeDividendByTicker(uptoDate){
+    const result = {};
+    TICKERS.forEach(t => result[t] = 0);
+    (state.dividendLog||[]).forEach(d => {
+      if(!uptoDate || d.date <= uptoDate){
+        result[d.ticker] = (result[d.ticker]||0) + d.total;
+      }
+    });
+    return result;
+  }
+
   function reconstructCostBasisAndRealizedPnL(){
     const costBasis = {}, qty = {};
     TICKERS.forEach(t => {
@@ -591,6 +619,8 @@ window.storage = {
       if(state.cashInterestEarned === undefined) state.cashInterestEarned = 0;
       if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
       if(!state.dailyInterestOnly) state.dailyInterestOnly = {};
+      if(!state.dividendLog) state.dividendLog = [];
+      if(state.dividendIncome === undefined) state.dividendIncome = 0;
       if(state.positionCostBasis === undefined || state.realizedPnL === undefined){
         const rebuilt = reconstructCostBasisAndRealizedPnL();
         if(state.positionCostBasis === undefined) state.positionCostBasis = rebuilt.costBasis;
@@ -614,7 +644,7 @@ window.storage = {
     const last = state.lastInterestDate || today;
     const daysElapsed = Math.round((new Date(today) - new Date(last)) / 86400000);
     if(daysElapsed <= 0){ return 0; }
-    const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1; // girilen deger TEFAS 1 aylik % (yillik degil)
+    const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/7) - 1; // girilen deger TEFAS 1 haftalik % (aylik degil)
     const before = state.cash;
     if(!state.dailyCashSnapshots) state.dailyCashSnapshots = {};
     if(!state.dailyInterestOnly) state.dailyInterestOnly = {};
@@ -667,7 +697,7 @@ window.storage = {
     // 2) Kuruluştan bugüne, YENİ oranla gün gün yeniden kur; rotasyon günlerinde
     //    yukarıda bulunan gerçek alım/satım etkisini (tradeDelta) ekle.
     const today = new Date().toISOString().slice(0,10);
-    const dailyRate = newAnnualPct > 0 ? Math.pow(1 + newAnnualPct/100, 1/30) - 1 : 0; // girilen deger TEFAS 1 aylik %
+    const dailyRate = newAnnualPct > 0 ? Math.pow(1 + newAnnualPct/100, 1/7) - 1 : 0; // girilen deger TEFAS 1 haftalik %
     let runningCash = kurulumCash;
     const newSnapshots = {};
     const newInterestOnly = {};
@@ -712,7 +742,7 @@ window.storage = {
       cashYesterday = state.dailyCashSnapshots[yesterdayStr];
     } else if(state.cashAnnualYieldPct > 0){
       // Dünün kaydı yoksa, bugünkü nakitten bir günlük faizi geri çıkararak tahmin et
-      const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1; // girilen deger TEFAS 1 aylik % (yillik degil)
+      const dailyRate = Math.pow(1 + state.cashAnnualYieldPct/100, 1/7) - 1; // girilen deger TEFAS 1 haftalik % (aylik degil)
       cashYesterday = state.cash / (1 + dailyRate);
     } else {
       cashYesterday = state.cash;
@@ -883,10 +913,10 @@ window.storage = {
           <input type="date" id="kur-date" value="${new Date().toISOString().slice(0,10)}">
         </div>
         <div class="field" style="max-width:280px;">
-          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Aylık %)</label>
+          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Haftalık %)</label>
           <input type="number" step="0.01" min="0" id="kur-ppf" value="${DEFAULT_PPF_ANNUAL_PCT}">
         </div>
-        <p class="muted" style="margin-top:-6px;margin-bottom:14px;font-size:11.5px;">TEFAS'ta GTL fon sayfasındaki <b>"Son 1 Ay"</b> getiri yüzdesini olduğu gibi buraya girin (yıllıklandırma otomatik yapılır). Bu oran sık değişir, her kontrolünüzde güncel 1 aylık değerle güncelleyin. 0 girerseniz nakde faiz işlenmez.</p>
+        <p class="muted" style="margin-top:-6px;margin-bottom:14px;font-size:11.5px;">TEFAS'ta GTL fon sayfasındaki <b>"Son 1 Hafta"</b> getiri yüzdesini olduğu gibi buraya girin (yıllıklandırma otomatik yapılır). Aylık/yıllık ortalamalar, faiz oranı hızla değiştiğinde 1 ay gecikmeli yanıltıcı sonuç verebiliyor — haftalık daha güncel bir referanstır. Bu oran sık değişir, her kontrolünüzde güncel 1 haftalık değerle güncelleyin. 0 girerseniz nakde faiz işlenmez.</p>
         <div class="grid2" id="kurulum-inputs"></div>
         <button class="btn" id="kur-btn">Portföyü Kur</button>
         <div id="kur-error" style="color:var(--loss);font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:8px;"></div>
@@ -932,6 +962,8 @@ window.storage = {
         totalStopajPaid: 0,
         positions: positions,
         positionCostBasis: Object.assign({}, prices),
+        dividendLog: [],
+        dividendIncome: 0,
         realizedPnL: 0,
         lastPrices: prices,
         dailyPrices: Object.assign({}, prices),
@@ -1002,6 +1034,10 @@ window.storage = {
         ${renderCashManagement(state.cash, stockVal, total)}
       </div>
       <div class="card">
+        <h2 class="section-title">Temettüler</h2>
+        ${renderDividendSection()}
+      </div>
+      <div class="card">
         <h2 class="section-title">Pozisyonlar</h2>
         <table class="responsive-table">
           <thead><tr><th>Hisse</th><th>Adet</th><th>Fiyat</th><th>Değer</th><th>Hedef Farkı</th></tr></thead>
@@ -1010,6 +1046,20 @@ window.storage = {
         <div class="note-box">Hedef bant: hisse başı ~${fmt(state.targetPerStock)}. Cuma kapanışı sonrası "Bu Hafta" sekmesinden fiyatları girip rotasyonu uygulayın.</div>
       </div>
     `;
+    document.getElementById('div-save-btn').onclick = async () => {
+      const msgEl = document.getElementById('div-msg');
+      const ticker = document.getElementById('div-ticker').value;
+      const date = document.getElementById('div-date').value;
+      const perShareRaw = document.getElementById('div-per-share').value.toString().replace(',', '.');
+      const perShare = parseFloat(perShareRaw);
+      if(!date){ msgEl.style.color='var(--loss)'; msgEl.textContent = '✕ Tarih girin.'; return; }
+      if(isNaN(perShare) || perShare <= 0){ msgEl.style.color='var(--loss)'; msgEl.textContent = '✕ Geçerli bir net temettü tutarı girin.'; return; }
+      const total = recordDividend(ticker, date, perShare);
+      await saveState();
+      msgEl.style.color = 'var(--gain)';
+      msgEl.textContent = `✓ ${ticker} için ${fmt(total)} temettü kaydedildi ve nakde eklendi.`;
+      setTimeout(() => renderPanel(), 900);
+    };
     document.getElementById('cash-settings-save').onclick = async () => {
       const thresholdRaw = document.getElementById('cash-threshold-input').value.toString().replace(',', '.');
       const ppfRaw = document.getElementById('ppf-rate-input').value.toString().replace(',', '.');
@@ -1122,6 +1172,44 @@ window.storage = {
     `;
   }
 
+  function renderDividendSection(){
+    const income = state.dividendIncome || 0;
+    const log = (state.dividendLog || []).slice().reverse();
+    const logHtml = log.length === 0
+      ? `<p class="muted" style="font-size:12.5px;">Henüz kaydedilmiş temettü yok.</p>`
+      : `<ul class="txn-list" style="margin:0;">${log.map(d => `
+          <li>
+            <span>${d.ticker} · ${d.date}</span>
+            <span>${fmtInt(d.qty)} adet × ${fmt(d.perShare)} = <b>${fmt(d.total)}</b></span>
+          </li>
+        `).join('')}</ul>`;
+    return `
+      <p class="muted" style="margin-bottom:14px;">Bir hisse temettü dağıttığında, borsada fiyatı genelde temettü tutarı kadar düşer — bu normaldir. Önemli olan, o düşüşün karşılığı olan nakdin de buradan kaydedilmesi; aksi halde sistem gerçekte olmayan bir "kayıp" gösterir ve rotasyonda gereksiz alım yapabilir.</p>
+      <div class="stat-row" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="label">Toplam Temettü Geliri</div><div class="value diff-up">+${fmt(income)}</div></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+        <div class="field" style="max-width:130px;">
+          <label>Hisse</label>
+          <select id="div-ticker">
+            ${TICKERS.map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label>Tarih</label>
+          <input type="date" id="div-date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label>Net Temettü (₺/lot)</label>
+          <input type="number" step="0.0001" min="0" id="div-per-share" placeholder="örn. 2,50">
+        </div>
+        <button class="btn" id="div-save-btn" style="margin-bottom:2px;">Temettü Kaydet</button>
+      </div>
+      <div id="div-msg" style="font-family:'IBM Plex Mono',monospace;font-size:12px;margin-bottom:12px;"></div>
+      ${logHtml}
+    `;
+  }
+
   function renderCashManagement(cash, stockVal, total){
     const cashPct = total ? (cash/total*100) : 0;
     const threshold = state.cashThresholdPct;
@@ -1131,10 +1219,10 @@ window.storage = {
     const ppfPct = state.cashAnnualYieldPct || 0;
 
     let html = `
-      <p class="muted" style="margin-bottom:14px;">Nakit, aşağıdaki TEFAS "Son 1 Ay" getiri varsayımıyla (Garanti Portföy Birinci Para Piyasası Fonu, GTL) günlük bileşik faiz kazanır — girilen değer otomatik yıllıklandırılır. Oran sık değiştiği için her kontrolünüzde güncelleyin — 0 girerseniz faiz işlenmez.</p>
+      <p class="muted" style="margin-bottom:14px;">Nakit, aşağıdaki TEFAS "Son 1 Hafta" getiri varsayımıyla (Garanti Portföy Birinci Para Piyasası Fonu, GTL) günlük bileşik faiz kazanır — girilen değer otomatik yıllıklandırılır. Haftalık referans, aylık/yıllık ortalamalara göre faiz değişimlerini daha hızlı yansıtır (gecikme riski azalır). Oran sık değiştiği için her kontrolünüzde güncelleyin — 0 girerseniz faiz işlenmez.</p>
       <div class="grid2">
         <div class="field">
-          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Aylık %)</label>
+          <label>Nakde PPF Getiri Varsayımı (TEFAS 1 Haftalık %)</label>
           <input type="number" step="0.01" min="0" id="ppf-rate-input" value="${ppfPct}">
         </div>
         <div class="field">
@@ -1151,7 +1239,7 @@ window.storage = {
       </div>
       ${renderPendingSettlementsList()}
       <div class="note-box" style="margin-top:16px;">
-        Oran yanlış girilmişse (örn. yıllık değer girilmiş olması gibi bir hata fark ettiyseniz): yukarıya doğru 1 aylık TEFAS değerini girip aşağıdaki butona basın. Bu, <b>kuruluştan bugüne kadar tüm faiz geçmişini</b> yeni oranla yeniden kurar — rotasyonlarda yaptığınız gerçek alım/satımların nakit etkisi korunur, sadece faiz kısmı düzeltilir. Normal oran güncellemesi (yukarıdaki "Ayarları Kaydet") sadece ileriye dönük çalışır; bu buton istisnai bir düzeltme aracıdır.
+        Oran yanlış girilmişse (örn. yıllık/aylık değer girilmiş olması gibi bir hata fark ettiyseniz): yukarıya doğru 1 haftalık TEFAS değerini girip aşağıdaki butona basın. Bu, <b>kuruluştan bugüne kadar tüm faiz geçmişini</b> yeni oranla yeniden kurar — rotasyonlarda yaptığınız gerçek alım/satımların nakit etkisi korunur, sadece faiz kısmı düzeltilir. Normal oran güncellemesi (yukarıdaki "Ayarları Kaydet") sadece ileriye dönük çalışır; bu buton istisnai bir düzeltme aracıdır.
       </div>
       <button class="btn ghost" id="recalc-history-btn" style="margin-top:10px;border-color:var(--loss);color:var(--loss);">Geçmişi Bu Oranla Yeniden Hesapla</button>
       <span id="recalc-history-msg" style="margin-left:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;"></span>
@@ -1329,7 +1417,7 @@ window.storage = {
           computeAndShow();
         };
       });
-      if(dailyChartMode === 'genel'){
+      if(dailyChartMode === 'genel' || dailyChartMode === 'hisseler'){
         wireChartTooltips('daily-chart-wrap', 'daily-chart-tooltip');
       } else {
         wirePositionsTooltips();
@@ -1342,16 +1430,19 @@ window.storage = {
   }
 
   function renderDailyChartSection(){
+    const titles = { genel: 'Günlük Genel Seyir', hisseler: 'Hisseler (PPF Hariç)', pozisyonlar: 'Pozisyonlar' };
+    const modes = ['genel', 'hisseler', 'pozisyonlar'];
+    const labels = { genel: 'Genel', hisseler: 'Hisseler', pozisyonlar: 'Pozisyonlar' };
     return `
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
-          <h2 class="section-title" style="font-size:15px;margin:0;">${dailyChartMode==='genel' ? 'Günlük Genel Seyir' : 'Pozisyonlar'}</h2>
+          <h2 class="section-title" style="font-size:15px;margin:0;">${titles[dailyChartMode]}</h2>
           <div style="display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:3px;">
-            <button type="button" class="chart-toggle-btn" data-mode="genel" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${dailyChartMode==='genel'?'var(--brass)':'transparent'};color:${dailyChartMode==='genel'?'#062318':'var(--ink-soft)'};">Genel</button>
-            <button type="button" class="chart-toggle-btn" data-mode="pozisyonlar" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${dailyChartMode==='pozisyonlar'?'var(--brass)':'transparent'};color:${dailyChartMode==='pozisyonlar'?'#062318':'var(--ink-soft)'};">Pozisyonlar</button>
+            ${modes.map(m => `<button type="button" class="chart-toggle-btn" data-mode="${m}" style="font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;background:${dailyChartMode===m?'var(--brass)':'transparent'};color:${dailyChartMode===m?'#062318':'var(--ink-soft)'};">${labels[m]}</button>`).join('')}
           </div>
         </div>
-        ${dailyChartMode==='genel' ? renderDailyChartGenel() : renderPositionsChart()}
+        ${dailyChartMode==='genel' ? renderDailyChartGenel() : dailyChartMode==='hisseler' ? renderDailyChartHisseler() : renderPositionsChart()}
+        ${dailyChartMode==='hisseler' ? '<p class="muted" style="font-size:11px;margin-top:8px;">PPF (nakit faizi) katkısı çıkarılmış toplam kâr/zarar — sadece hisse fiyat hareketleri, rotasyon kazançları ve stopajın net etkisini gösterir.</p>' : ''}
       </div>
     `;
   }
@@ -1418,6 +1509,77 @@ window.storage = {
     `;
   }
 
+  // Belirli bir tarihe kadar (dahil), kaydedilmiş saf PPF faizinin toplamını verir.
+  function cumulativePPFInterest(uptoDate){
+    const interestOnly = state.dailyInterestOnly || {};
+    let total = 0;
+    Object.keys(interestOnly).forEach(d => {
+      if(!uptoDate || d <= uptoDate) total += interestOnly[d];
+    });
+    return total;
+  }
+
+  function renderDailyChartHisseler(){
+    const byDate = {};
+    state.history.forEach(h => { byDate[h.date] = h.totalValue; });
+    (state.dailyLog||[]).forEach(d => { byDate[d.date.slice(0,10)] = d.totalValue; });
+    const merged = Object.keys(byDate).sort().map(date => ({date, totalValue: byDate[date]}));
+    if(merged.length === 0){
+      return `<p class="muted">Henüz günlük kayıt yok. "Bu Tarihi Kaydet" ile trend grafiğini oluşturmaya başlayın.</p>`;
+    }
+    const log = merged.slice(-30);
+    // PPF katkısı çıkarılmış K/Z: toplam K/Z'den, o güne kadarki kümülatif PPF
+    // faizini çıkarıyoruz — geriye hisse fiyat hareketleri + rotasyon kazançları
+    // + stopajın net etkisi kalıyor.
+    const pnlFor = (pt) => (pt.totalValue - TOTAL_BUDGET) - cumulativePPFInterest(pt.date);
+    const pnlVals = log.map(pnlFor);
+    let maxV = Math.max(0, ...pnlVals);
+    let minV = Math.min(0, ...pnlVals);
+    const pad = Math.max((maxV-minV)*0.08, Math.max(Math.abs(maxV),Math.abs(minV))*0.03, 150);
+    maxV += pad;
+    minV -= pad;
+    const w = 400, h = 380, padL=56, padR=14, padT=18, padB=32;
+    const plotW = w-padL-padR, plotH = h-padT-padB;
+    const xFor = (i) => padL + (log.length===1 ? plotW/2 : i/(log.length-1)*plotW);
+    const yFor = (v) => padT + plotH - ((v-minV)/((maxV-minV)||1))*plotH;
+    const zeroY = yFor(0);
+    const zeroPath = `M ${padL} ${zeroY.toFixed(1)} L ${(w-padR).toFixed(1)} ${zeroY.toFixed(1)}`;
+    let path = log.map((pt,i) => `${i===0?'M':'L'} ${xFor(i).toFixed(1)} ${yFor(pnlFor(pt)).toFixed(1)}`).join(' ');
+    let dots = log.map((pt,i) => `<circle class="pnl-dot" cx="${xFor(i).toFixed(1)}" cy="${yFor(pnlFor(pt)).toFixed(1)}" r="6" fill="#E0A72F" stroke="#0A1628" stroke-width="1.4" data-date="${pt.date}" data-invested="${TOTAL_BUDGET}" data-pnl="${pnlFor(pt)}"/>`).join('');
+
+    const fmtAxis = (n) => Math.round(n).toLocaleString('tr-TR') + ' ₺';
+    const yAxisLabels = `
+      <text x="${padL-6}" y="${(padT+4).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtAxis(maxV)}</text>
+      <text x="${padL-6}" y="${(h-padB-2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${fmtAxis(minV)}</text>
+    `;
+
+    let xAxisLabels = '';
+    let lastMonth = null;
+    log.forEach((pt, i) => {
+      const month = pt.date.slice(0,7);
+      if(month !== lastMonth){
+        xAxisLabels += `<text x="${xFor(i).toFixed(1)}" y="${h-padB+16}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="#8CA0BC">${monthLabel(month)}</text>`;
+        lastMonth = month;
+      }
+    });
+
+    return `
+      <div class="chart-wrap" id="daily-chart-wrap">
+        <svg width="100%" viewBox="0 0 ${w} ${h}" style="max-width:100%;">
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <line x1="${padL}" y1="${h-padB}" x2="${w-padR}" y2="${h-padB}" stroke="#294869" stroke-width="1"/>
+          <path d="${zeroPath}" fill="none" stroke="#7FA3C9" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="${padL-6}" y="${zeroY.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#7FA3C9">0</text>
+          ${yAxisLabels}
+          ${xAxisLabels}
+          <path d="${path}" fill="none" stroke="#E0A72F" stroke-width="2"/>
+          ${dots}
+        </svg>
+        <div class="chart-tooltip" id="daily-chart-tooltip"></div>
+      </div>
+    `;
+  }
+
   function renderPositionsChart(){
     // Kasıtlı olarak SADECE bundan sonra "Bu Tarihi Kaydet" ile hisse fiyatı da
     // içeren günlük kayıtları kullanıyoruz — kuruluş (31 Temmuz) ve eski (fiyatsız)
@@ -1449,7 +1611,7 @@ window.storage = {
     // PPF (nakit) referans serisi: kayıtlı günlük orana göre, saf bileşik büyüme
     // endeksi — alım/satım nakit akışlarından bağımsız, "sadece nakitte kalsaydım
     // ne olurdu" karşılaştırması için.
-    const ppfRate = (state.cashAnnualYieldPct||0) > 0 ? Math.pow(1 + state.cashAnnualYieldPct/100, 1/30) - 1 : 0;
+    const ppfRate = (state.cashAnnualYieldPct||0) > 0 ? Math.pow(1 + state.cashAnnualYieldPct/100, 1/7) - 1 : 0;
     const firstDate = dates[0];
     const ppfPctByDate = {};
     dates.forEach(d => {
@@ -2086,9 +2248,10 @@ window.storage = {
       });
       const month = entry.date.slice(0,7);
       const totalPnl = {};
+      const divSoFar = cumulativeDividendByTicker(entry.date);
       TICKERS.forEach(t => {
         const price = entry.positions && entry.positions[t] ? entry.positions[t].price : costBasis[t];
-        totalPnl[t] = qty[t]*(price-costBasis[t]) + cumRealized[t];
+        totalPnl[t] = qty[t]*(price-costBasis[t]) + cumRealized[t] + divSoFar[t];
       });
       if(!monthlySnap[month] || entry.date >= monthlySnap[month].date){
         monthlySnap[month] = { date: entry.date, totalPnl };
@@ -2098,12 +2261,12 @@ window.storage = {
     const today = new Date().toISOString().slice(0,10);
     const nowMonth = today.slice(0,7);
     const nowTotalPnl = {};
+    const divNow = cumulativeDividendByTicker(null);
     TICKERS.forEach(t => {
       const price = state.dailyPrices[t]||state.lastPrices[t];
       const liveCost = state.positionCostBasis && state.positionCostBasis[t] !== undefined ? state.positionCostBasis[t] : costBasis[t];
       const liveQty = state.positions[t] !== undefined ? state.positions[t] : qty[t];
-      const liveRealized = state.realizedPnL !== undefined ? cumRealized[t] : cumRealized[t]; // per-ticker realized zaten cumRealized'ta
-      nowTotalPnl[t] = liveQty*(price-liveCost) + cumRealized[t];
+      nowTotalPnl[t] = liveQty*(price-liveCost) + cumRealized[t] + divNow[t];
     });
     if(!monthlySnap[nowMonth] || today >= monthlySnap[nowMonth].date){
       monthlySnap[nowMonth] = { date: today, totalPnl: nowTotalPnl };
