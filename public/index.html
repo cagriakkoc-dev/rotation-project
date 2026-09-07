@@ -1934,6 +1934,18 @@ window.storage = {
         positions: Object.fromEntries(TICKERS.map(t=>[t,{price:prices[t],qty:positions[t],value:positions[t]*prices[t]}])),
         transactions: transactions
       });
+      // Cron'daki davranışla tutarlı olsun diye: rotasyon sonrası dailyLog'a da
+      // bir kayıt düşüyoruz — yoksa Pozisyonlar/Hisseler (PPF Hariç) grafikleri
+      // (sadece dailyLog okur) bu tarihte boşluk gösterir.
+      if(!state.dailyLog) state.dailyLog = [];
+      const stockValNow = TICKERS.reduce((s,t)=>s+positions[t]*prices[t],0);
+      state.dailyLog.push({
+        date: date + ' ' + new Date().toTimeString().slice(0,5),
+        totalValue: totalValue,
+        cash: cash,
+        stockValue: stockValNow,
+        prices: Object.assign({}, prices)
+      });
       await saveState();
 
       const resEl = document.getElementById('hafta-result');
