@@ -350,6 +350,15 @@
       letter-spacing: .05em;
       text-align: left;
     }
+
+    /* Güvenlik ağı: ileride card-görünümüne çevrilmemiş bir tablo eklenirse
+       (responsive-table class'ı olmadan) sayfanın tamamı yatay kaymasın diye —
+       taşma tablonun kendi içinde, yatay kaydırmayla sınırlı kalır. */
+    table:not(.responsive-table){
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
   }
 </style>
 
@@ -2048,7 +2057,7 @@ window.storage = {
       }
       return `
         <tr class="hist-row" data-idx="${idx}" style="cursor:pointer;">
-          <td style="text-align:left;">▸ ${pt.date}</td><td>${fmt(pt.totalValue)}</td><td>${fmt(pt.cash)}</td><td>${fmt(pt.totalValue-pt.cash)}</td>
+          <td style="text-align:left;" data-label="Tarih">▸ ${pt.date}</td><td data-label="Toplam Varlık">${fmt(pt.totalValue)}</td><td data-label="Nakit">${fmt(pt.cash)}</td><td data-label="Hisse Değeri">${fmt(pt.totalValue-pt.cash)}</td>
         </tr>
         <tr class="hist-detail" id="hist-detail-${idx}" style="display:none;">
           <td colspan="4" style="background:var(--bg-2);border-radius:8px;">
@@ -2078,7 +2087,7 @@ window.storage = {
           ${dots}
         </svg>
         <p class="muted" style="margin-top:14px;font-size:11.5px;">Bir satıra tıklayarak o haftaki alım/satım detaylarını görebilirsiniz.</p>
-        <table style="margin-top:4px;">
+        <table class="responsive-table" style="margin-top:4px;">
           <thead><tr><th>Tarih</th><th>Toplam Varlık</th><th>Nakit</th><th>Hisse Değeri</th></tr></thead>
           <tbody>
             ${rowsHtml}
@@ -2157,10 +2166,10 @@ window.storage = {
       </div>
       ${renderMonthlyPnlSection()}
       <div class="card">
-        <table>
+        <table class="responsive-table">
           <thead><tr><th>Tarih</th><th>Yatırılan</th><th>Kâr/Zarar</th><th>Getiri %</th></tr></thead>
           <tbody>
-            ${series.slice().reverse().map(pt => `<tr><td style="text-align:left;">${pt.date}</td><td>${fmt(pt.invested)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}">${pt.pnl>=0?'+':''}${fmt(pt.pnl)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}">${pt.pnl>=0?'+':''}${(pt.pnl/TOTAL_BUDGET*100).toFixed(2)}%</td></tr>`).join('')}
+            ${series.slice().reverse().map(pt => `<tr><td style="text-align:left;" data-label="Tarih">${pt.date}</td><td data-label="Yatırılan">${fmt(pt.invested)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}" data-label="Kâr/Zarar">${pt.pnl>=0?'+':''}${fmt(pt.pnl)}</td><td class="${pt.pnl>=0?'diff-up':'diff-down'}" data-label="Getiri %">${pt.pnl>=0?'+':''}${(pt.pnl/TOTAL_BUDGET*100).toFixed(2)}%</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
